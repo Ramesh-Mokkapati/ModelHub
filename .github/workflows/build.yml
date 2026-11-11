@@ -42,11 +42,16 @@ jobs:
       - name: Prepare vcpkg
         shell: pwsh
         run: |
-          # The image's vcpkg must contain the builtin-baseline commit from vcpkg.json.
+          # Use vcpkg exactly at the builtin-baseline commit from vcpkg.json. The image's copy may be older, and
+          # vcpkg reads package versions from its checked-out files, so having the commit alone is not enough.
           $vcpkg = $env:VCPKG_INSTALLATION_ROOT
           $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
           git -C $vcpkg cat-file -e "$baseline^{commit}" 2>$null
           if ($LASTEXITCODE -ne 0) { git -C $vcpkg fetch --quiet origin; if ($LASTEXITCODE -ne 0) { exit 1 } }
+          git -C $vcpkg -c advice.detachedHead=false checkout --quiet --force $baseline
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & "$vcpkg/bootstrap-vcpkg.bat" -disableMetrics   # the vcpkg tool that goes with those files
+          if ($LASTEXITCODE -ne 0) { exit 1 }
           New-Item -ItemType Directory -Force $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
           "VCPKG_ROOT=$vcpkg" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
