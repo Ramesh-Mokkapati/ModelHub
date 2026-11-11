@@ -113,6 +113,9 @@ TEST(HfBrowse, TakesTheModelCardsDescriptionNotTheQuantisationNotes) {
                        "significant improvements in code generation, code reasoning and code fixing.\n\n```\ncode\n```\n";
     EXPECT_EQ(CardParagraph(card), "X-Coder is the latest series of code-specific large language models, with significant "
                                    "improvements in code generation, code reasoning and code fixing.");
+    std::string listIntro = "# X\n\nX is a family of models for code, in six sizes. It improves on the previous "
+                            "generation in these ways:\n\n- one\n- two\n";
+    EXPECT_EQ(CardParagraph(listIntro), "X is a family of models for code, in six sizes.");
     std::string longer(2000, 'a');
     longer = "A model. " + std::string(300, 'b') + ". " + std::string(800, 'c');
     EXPECT_LE(CardParagraph(longer, 600).size(), 603u);
@@ -128,6 +131,7 @@ TEST(HfBrowse, JudgesEveryFileForThisPcAndRecommendsOne) {
     EXPECT_EQ(File(r, "mmproj-f16.gguf"), nullptr);
     EXPECT_EQ((*File(r, "Coder-7B-Instruct-Q4_0_4_8.gguf"))["reason"], "For ARM processors; this PC is x64");
     EXPECT_EQ((*File(r, "Coder-7B-Instruct-f32-00001-of-00002.gguf"))["reason"], "Split into parts: not supported yet");
+    EXPECT_EQ((*File(r, "Coder-7B-Instruct-f32-00001-of-00002.gguf"))["size"], 30ull << 30);  // both parts
     EXPECT_EQ((*File(r, "Coder-7B-Instruct-Q8_0.gguf"))["fit"], "gpu+cpu");
     EXPECT_EQ((*File(r, "Coder-7B-Instruct-Q4_K_M.gguf"))["fit"], "gpu");
     // 8 GB of graphics memory: the best quality that still fits on the card.

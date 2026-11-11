@@ -12,6 +12,8 @@ Everything local-LLM applications on a Windows PC share about models and llama.c
 - **llama.cpp.** The pinned, verified `llama-server` build, and servers started on demand (GPU layers chosen
   from the free graphics memory).
 
+![ModelHub Manager suggesting a model for one task on a PC with a 6 GB graphics card](docs/images/manager-suggestions.png)
+
 It comes in four parts, all built from one core (`src/core`, `HubCore`):
 
 | Part | What it is for |
@@ -41,6 +43,8 @@ without it.
 `ModelHubManager.exe` (next to `ModelHub.exe`) puts the ModelHub icon in the notification area. The dot shows
 the service: green while it runs, grey when stopped, amber while it starts, stops or a download runs.
 
+![The tray menu: open the manager, start, stop or restart the service, start with Windows](docs/images/tray-menu.png)
+
 - **Tray menu:**
   - *Open ModelHub Manager*. Clicking the icon does the same.
   - *Start service*, *Stop service*, *Restart service*. Stopping or restarting asks first if models are loaded,
@@ -65,6 +69,9 @@ the service: green while it runs, grey when stopped, amber while it starts, stop
     reported, not deleted.
   - **Browse Hugging Face...** opens the model browser (below).
   - **Add folder...** shares a folder of GGUF files with every application.
+
+  ![All models: how each runs on this PC, which are installed, and which task each is suggested for](docs/images/manager-models.png)
+
 - **Browse Hugging Face** finds any GGUF model on Hugging Face and downloads the file that suits this PC:
   - **Search** by name, or paste `owner/repo`, `owner/repo/file.gguf` or a huggingface.co address. Filter by kind
     (chat and writing, coding, embeddings) and sort by downloads, trend, likes or date. *Only models that run on
@@ -83,6 +90,9 @@ the service: green while it runs, grey when stopped, amber while it starts, stop
   - **Download** adds the file as a custom model for every application and downloads it like any other (verified
     by SHA-256, resumable); the main window shows the progress. Models are judged with an 8K context; layers and
     KV cache are estimated from the parameters.
+
+  ![Browsing Hugging Face: a model's best use and description, and each of its files judged for this PC](docs/images/hf-browser.png)
+
 - **How it runs:** it does its model work in its own process, with the same core as the DLL, so it works
   whether or not the service runs. Everything it changes (the store, custom models, folders) is shared with
   every application. Only one copy runs; starting it again shows the window. Pass `--tray` to start without the
@@ -177,6 +187,7 @@ Local builds are version 0.1.0 unless you pass `-DMODELHUB_VERSION=<version>`.
 | `src/sdk/` | `ModelHubSdk.dll` (the C interface over `HubCore`) |
 | `src/hub/` | `ModelHub.exe` (the HTTP service over `HubCore`) |
 | `src/manager/` | `ModelHubManager.exe` (tray icon, model manager and Hugging Face browser, Win32); icons in `res/` (`scripts/make_icons.py`) |
+| `docs/images/` | the screenshots in this README |
 | `include/modelhub/` | the public headers (C, C++14 wrapper, service client) |
 | `config/catalog.json` | the catalog: models and task profiles |
 | `cmake/` | llama.cpp download and the `ModelHubConfig.cmake` template |

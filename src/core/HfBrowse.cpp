@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <map>
 #include <regex>
 #include <sstream>
 
@@ -222,9 +223,16 @@ std::string CardParagraph(const std::string& markdown, size_t maxChars) {
                                      "made using", "huggingface-cli", "download", "license", "citation", "@misc", "metal",
                                      "arm chips", "offload", "repack", "*not*", "q4_0", "q8_0", "bpw"}))
             continue;
-        if (p.size() <= maxChars) return p;
-        size_t cut = p.rfind(". ", maxChars);
-        return cut != std::string::npos && cut > maxChars / 3 ? p.substr(0, cut + 1) : p.substr(0, maxChars) + "...";
+        std::string q = p;
+        if (!q.empty() && q.back() == ':') {
+            size_t end = q.rfind(". ");
+            if (end == std::string::npos) continue;
+            q.resize(end + 1);
+        }
+        if (q.size() <= maxChars) return q;
+        const std::string& p2 = q;
+        size_t cut = p2.rfind(". ", maxChars);
+        return cut != std::string::npos && cut > maxChars / 3 ? p2.substr(0, cut + 1) : p2.substr(0, maxChars) + "...";
     }
     return "";
 }
@@ -355,6 +363,15 @@ json EvaluateRepo(const std::string& base, const std::string& repo, const json& 
 
     json files = json::array();
     bool folders = false;
+    static const std::regex split(R"(-(\d{5})-of-(\d{5})\.gguf$)", std::regex::icase);
+    std::map<std::string, uint64_t> splitTotal;  // "name-of-00003.gguf" -> the size of all its parts
+    if (tree.is_array())
+        for (const auto& e : tree) {
+            const std::string path = e.value("path", "");
+            std::smatch sm;
+            if (path.find('/') == std::string::npos && std::regex_search(path, sm, split))
+                splitTotal[path.substr(0, sm.position(0)) + "-of-" + sm[2].str()] += e.value("size", uint64_t{0});
+        }
     if (tree.is_array())
         for (const auto& e : tree) {
             const std::string path = e.value("path", "");
@@ -367,11 +384,11 @@ json EvaluateRepo(const std::string& base, const std::string& repo, const json& 
                 folders = true;
                 continue;
             }
-            static const std::regex split(R"(-(\d{5})-of-(\d{5})\.gguf$)", std::regex::icase);
             std::smatch sm;
             bool isSplit = std::regex_search(path, sm, split);
             if (isSplit && sm[1] != "00001") continue;  // one row per split model
-            const uint64_t size = e.value("size", uint64_t{0});
+            const uint64_t size = isSplit ? splitTotal[path.substr(0, sm.position(0)) + "-of-" + sm[2].str()]
+                                          : e.value("size", uint64_t{0});
             std::string sha;
             if (auto lfs = e.value("lfs", json::object()); lfs.is_object()) sha = ToLower(lfs.value("oid", ""));
             QuantInfo q = ParseQuant(path);
