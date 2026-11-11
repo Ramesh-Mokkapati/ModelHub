@@ -1,0 +1,585 @@
+{
+  "format": "modelhub-catalog",
+  "version": 1,
+  "comment": "Local GGUF models ModelHub can suggest, download and serve. Each file is pinned by exact size and SHA-256; 'alternates' are other files of the same model that are accepted when already present. Tasks say which models suit a job (see README). A copy at %LOCALAPPDATA%\\ModelHub\\catalog.json overrides this one.",
+  "models": [
+    {
+      "id": "nomic-embed-text-v1.5",
+      "aliases": [
+        "nomic-embed-text"
+      ],
+      "name": "nomic-embed-text v1.5",
+      "family": "nomic",
+      "file": "nomic-embed-text-v1.5.Q8_0.gguf",
+      "url": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q8_0.gguf",
+      "size": 146146432,
+      "sha256": "3e24342164b3d94991ba9692fdc0dd08e3fd7362e0aacc396a9a5c54a544c3b7",
+      "params_b": 0.14,
+      "active_params_b": 0.14,
+      "tier": 1,
+      "layers": 12,
+      "context_k": 8,
+      "kv_cache_mb_8k": 64,
+      "tools": false,
+      "embeddings": true,
+      "license": "Apache-2.0",
+      "summary": "Embeddings for similar-function search (optional)."
+    },
+    {
+      "id": "qwen2.5-coder-0.5b",
+      "aliases": [
+        "qwen2.5-coder:0.5b"
+      ],
+      "name": "Qwen2.5-Coder 0.5B (smoke test) (Q4_K_M)",
+      "family": "qwen2.5-coder",
+      "file": "Qwen2.5-Coder-0.5B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Qwen2.5-Coder-0.5B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-0.5B-Instruct-Q4_K_M.gguf",
+      "size": 397808288,
+      "sha256": "0128e77564e43d40682f82d7ebe8a9abdf0c24c8f55fa85629f8cc156b1b6560",
+      "params_b": 0.5,
+      "active_params_b": 0.5,
+      "tier": 1,
+      "layers": 24,
+      "context_k": 32,
+      "kv_cache_mb_8k": 64,
+      "tools": true,
+      "license": "Apache-2.0",
+      "summary": "Tiny; for checking the setup only. Never suggested."
+    },
+    {
+      "id": "qwen2.5-coder-1.5b",
+      "name": "Qwen2.5-Coder 1.5B Instruct (Q4_K_M)",
+      "family": "qwen2.5-coder",
+      "file": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+      "size": 1117320768,
+      "sha256": "cc324af070c2ecbfd324a30884d2f951a7ff756aba85cb811a6ec436933bb046",
+      "params_b": 1.5,
+      "active_params_b": 1.5,
+      "tier": 1,
+      "layers": 28,
+      "context_k": 32,
+      "kv_cache_mb_8k": 250,
+      "tools": true,
+      "license": "Apache-2.0",
+      "summary": "Starter: small and fast; good for small code bases, shallower explanations."
+    },
+    {
+      "id": "qwen2.5-coder-3b",
+      "aliases": [
+        "qwen2.5-coder:3b"
+      ],
+      "name": "Qwen2.5-Coder 3B Instruct (Q4_K_M)",
+      "family": "qwen2.5-coder",
+      "file": "qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+      "size": 2104932800,
+      "sha256": "724fb256bec1ff062b2f65e4569e871ad2e95ab2a3989723d1769c54294730b7",
+      "params_b": 3.1,
+      "active_params_b": 3.1,
+      "tier": 1,
+      "layers": 36,
+      "context_k": 32,
+      "kv_cache_mb_8k": 300,
+      "tools": true,
+      "license": "Qwen Research (non-commercial)",
+      "summary": "Between the 1.5B and the 7B: noticeably better than the 1.5B and still fast on 8 GB PCs. Its licence does not allow commercial use.",
+      "alternates": [
+        {
+          "file": "Qwen2.5-Coder-3B-Instruct-Q4_K_M.gguf",
+          "url": "https://huggingface.co/bartowski/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-3B-Instruct-Q4_K_M.gguf",
+          "size": 1929903360,
+          "sha256": "3da3afe6cf5c674ac195803ea0dd6fee7e1c228c2105c1ce8c66890d1d4ab460"
+        }
+      ]
+    },
+    {
+      "id": "gemma-3-4b",
+      "name": "Gemma 3 4B Instruct (Q4_K_M)",
+      "family": "gemma-3",
+      "file": "gemma-3-4b-it-Q4_K_M.gguf",
+      "url": "https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf",
+      "size": 2489894016,
+      "sha256": "04a43a22e8d2003deda5acc262f68ec1005fa76c735a9962a8c77042a74a7d19",
+      "params_b": 4.3,
+      "active_params_b": 4.3,
+      "tier": 1,
+      "layers": 34,
+      "context_k": 32,
+      "kv_cache_mb_8k": 1100,
+      "tools": false,
+      "license": "Gemma Terms of Use",
+      "summary": "Google's small general model: clear, readable explanations of what went wrong."
+    },
+    {
+      "id": "phi-4-mini",
+      "name": "Phi-4-mini 3.8B Instruct (Q4_K_M)",
+      "family": "phi-4",
+      "file": "microsoft_Phi-4-mini-instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf",
+      "size": 2491874688,
+      "sha256": "01999f17c39cc3074afae5e9c539bc82d45f2dd7faa3917c66cbef76fce8c0c2",
+      "params_b": 3.8,
+      "active_params_b": 3.8,
+      "tier": 1,
+      "layers": 32,
+      "context_k": 32,
+      "kv_cache_mb_8k": 1024,
+      "tools": true,
+      "license": "MIT",
+      "summary": "Microsoft's small general model. Not offered for log diagnosis: in testing it ignored the report format and cited evidence that does not exist."
+    },
+    {
+      "id": "qwen2.5-coder-7b",
+      "aliases": [
+        "qwen2.5-coder:7b"
+      ],
+      "name": "Qwen2.5-Coder 7B Instruct (Q4_K_M)",
+      "family": "qwen2.5-coder",
+      "file": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+      "size": 4683073536,
+      "sha256": "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c",
+      "params_b": 7.6,
+      "active_params_b": 7.6,
+      "tier": 2,
+      "layers": 28,
+      "context_k": 32,
+      "kv_cache_mb_8k": 500,
+      "tools": true,
+      "license": "Apache-2.0",
+      "summary": "Standard: clearly better reasoning about code; a good default for medium code bases.",
+      "alternates": [
+        {
+          "file": "Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf",
+          "url": "https://huggingface.co/bartowski/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf",
+          "size": 4683074336,
+          "sha256": "1664fccab734674a50763490a8c6931b70e3f2f8ec10031b54806d30e5f956b6"
+        }
+      ]
+    },
+    {
+      "id": "llama-3.1-8b",
+      "aliases": [
+        "llama3.1:8b"
+      ],
+      "name": "Llama 3.1 8B Instruct (Q4_K_M)",
+      "family": "llama-3.1",
+      "file": "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+      "size": 4920739232,
+      "sha256": "7b064f5842bf9532c91456deda288a1b672397a54fa729aa665952863033557c",
+      "params_b": 8.0,
+      "active_params_b": 8.0,
+      "tier": 2,
+      "layers": 32,
+      "context_k": 32,
+      "kv_cache_mb_8k": 1024,
+      "tools": true,
+      "license": "Llama 3.1 Community License",
+      "summary": "Meta's widely used general model; a different view from the Qwen coders at the same size."
+    },
+    {
+      "id": "qwen3-8b",
+      "aliases": [
+        "qwen3:8b"
+      ],
+      "name": "Qwen3 8B (Q4_K_M)",
+      "family": "qwen3",
+      "file": "Qwen_Qwen3-8B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Qwen_Qwen3-8B-GGUF/resolve/main/Qwen_Qwen3-8B-Q4_K_M.gguf",
+      "size": 5027784224,
+      "sha256": "54fffa050078e984116639c83dfb64b5aa6d4cd474e018b076777c632bbccccd",
+      "params_b": 8,
+      "active_params_b": 8,
+      "tier": 2,
+      "layers": 36,
+      "context_k": 32,
+      "kv_cache_mb_8k": 512,
+      "tools": true,
+      "license": "Apache-2.0",
+      "summary": "General model; cheap reviewer or planner."
+    },
+    {
+      "id": "gemma-3-12b",
+      "name": "Gemma 3 12B Instruct (Q4_K_M)",
+      "family": "gemma-3",
+      "file": "gemma-3-12b-it-Q4_K_M.gguf",
+      "url": "https://huggingface.co/unsloth/gemma-3-12b-it-GGUF/resolve/main/gemma-3-12b-it-Q4_K_M.gguf",
+      "size": 7300778336,
+      "sha256": "15b8fd9d8672cd4240c178c217ca781409291f34e353d2e913b29c7602ceb3ff",
+      "params_b": 12.2,
+      "active_params_b": 12.2,
+      "tier": 2,
+      "layers": 48,
+      "context_k": 32,
+      "kv_cache_mb_8k": 3072,
+      "tools": false,
+      "license": "Gemma Terms of Use",
+      "summary": "Strong general reasoning for explaining failures; dense, so slower than the 7B and 8B models."
+    },
+    {
+      "id": "qwen2.5-coder-14b",
+      "aliases": [
+        "qwen2.5-coder:14b"
+      ],
+      "name": "Qwen2.5-Coder 14B Instruct (Q4_K_M)",
+      "family": "qwen2.5-coder",
+      "file": "qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen2.5-Coder-14B-Instruct-GGUF/resolve/main/qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+      "size": 8988110272,
+      "sha256": "c1e659736d89ac1065fb495330fb824d94001974a4bfa78e7270e43476a8d940",
+      "params_b": 14.8,
+      "active_params_b": 14.8,
+      "tier": 3,
+      "layers": 48,
+      "context_k": 32,
+      "kv_cache_mb_8k": 1600,
+      "tools": true,
+      "license": "Apache-2.0",
+      "summary": "Large, dense: strong reasoning but every answer uses all 14B parameters, so it is slow on a CPU.",
+      "alternates": [
+        {
+          "file": "Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf",
+          "url": "https://huggingface.co/bartowski/Qwen2.5-Coder-14B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf",
+          "size": 8988111072,
+          "sha256": "2946d28c9e1bb2bcae6d42e8678863a31775df6f740315c7d7e6d6b6411f5937"
+        }
+      ]
+    },
+    {
+      "id": "qwen3-14b",
+      "aliases": [
+        "qwen3:14b"
+      ],
+      "name": "Qwen3 14B (Q4_K_M)",
+      "family": "qwen3",
+      "file": "Qwen_Qwen3-14B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Qwen_Qwen3-14B-GGUF/resolve/main/Qwen_Qwen3-14B-Q4_K_M.gguf",
+      "size": 9001753632,
+      "sha256": "915913e22399475dbe6c968ac014d9f1fbe08975e489279aede9d5c7b2c98eb6",
+      "params_b": 14,
+      "active_params_b": 14,
+      "tier": 2,
+      "layers": 40,
+      "context_k": 32,
+      "kv_cache_mb_8k": 896,
+      "tools": true,
+      "license": "Apache-2.0",
+      "summary": "General model; reviewer for 16 GB+ setups."
+    },
+    {
+      "id": "phi-4",
+      "name": "Phi-4 14B (Q4_K_M)",
+      "family": "phi",
+      "file": "phi-4-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/phi-4-GGUF/resolve/main/phi-4-Q4_K_M.gguf",
+      "size": 9053114816,
+      "sha256": "009aba717c09d4a35890c7d35eb59d54e1dba884c7c526e7197d9c13ab5911d9",
+      "params_b": 14.7,
+      "active_params_b": 14.7,
+      "tier": 3,
+      "layers": 40,
+      "context_k": 32,
+      "kv_cache_mb_8k": 1600,
+      "tools": false,
+      "license": "MIT",
+      "summary": "Microsoft's 14B reasoning model; strong at working out causes, but slow on a CPU like other dense 14B models."
+    },
+    {
+      "id": "deepseek-coder-v2-lite",
+      "aliases": [
+        "deepseek-coder-v2:16b"
+      ],
+      "name": "DeepSeek-Coder-V2-Lite 16B Instruct (Q4_K_M)",
+      "family": "deepseek-coder-v2",
+      "file": "DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF/resolve/main/DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf",
+      "size": 10364416768,
+      "sha256": "603bd3f8a0281d16571da7c08bd661ee17ff0d1be6fcbd1b42242da257ef0bb8",
+      "params_b": 15.7,
+      "active_params_b": 2.4,
+      "tier": 2,
+      "layers": 27,
+      "context_k": 32,
+      "kv_cache_mb_8k": 2200,
+      "tools": true,
+      "license": "DeepSeek License",
+      "summary": "Mixture-of-experts coder: about 2.4B parameters work per word, so it is fast on a CPU, with 7B-class code skills."
+    },
+    {
+      "id": "gpt-oss-20b",
+      "aliases": [
+        "gpt-oss:20b"
+      ],
+      "name": "gpt-oss 20B",
+      "family": "gpt-oss",
+      "file": "gpt-oss-20b-MXFP4.gguf",
+      "url": "https://huggingface.co/ggml-org/gpt-oss-20b-GGUF/resolve/main/gpt-oss-20b-MXFP4.gguf",
+      "size": 12109566624,
+      "sha256": "27cd6c432c7672cb812a92f611cf3ba7bbc35928262bb1e1253ff4ee6ae35901",
+      "params_b": 20,
+      "active_params_b": 3.6,
+      "tier": 3,
+      "layers": 24,
+      "context_k": 32,
+      "kv_cache_mb_8k": 1280,
+      "tools": true,
+      "license": "Apache-2.0",
+      "summary": "Reasoning model; good second opinion as reviewer."
+    },
+    {
+      "id": "devstral-small-24b",
+      "aliases": [
+        "devstral:24b"
+      ],
+      "name": "Devstral Small 24B (Q4_K_M)",
+      "family": "devstral",
+      "file": "mistralai_Devstral-Small-2507-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/mistralai_Devstral-Small-2507-GGUF/resolve/main/mistralai_Devstral-Small-2507-Q4_K_M.gguf",
+      "size": 14333916096,
+      "sha256": "6d597aa03c2a02bad861d15f282ae530d3b276b52255f37ba200d3c0de7d3aed",
+      "params_b": 24,
+      "active_params_b": 24,
+      "tier": 3,
+      "layers": 40,
+      "context_k": 32,
+      "kv_cache_mb_8k": 1536,
+      "tools": true,
+      "license": "Apache-2.0",
+      "summary": "Agentic coding model with strong tool use."
+    },
+    {
+      "id": "qwen3-coder-30b-a3b",
+      "aliases": [
+        "qwen3-coder:30b"
+      ],
+      "name": "Qwen3-Coder 30B-A3B Instruct (Q4_K_M)",
+      "family": "qwen3-coder-30b",
+      "file": "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf",
+      "size": 18556689568,
+      "sha256": "fadc3e5f8d42bf7e894a785b05082e47daee4df26680389817e2093056f088ad",
+      "params_b": 30.5,
+      "active_params_b": 3.3,
+      "tier": 3,
+      "layers": 48,
+      "context_k": 32,
+      "kv_cache_mb_8k": 800,
+      "tools": true,
+      "license": "Apache-2.0",
+      "summary": "Large, mixture-of-experts: the strongest here, yet only ~3B parameters work per word, so it answers about as fast as a small model. Needs plenty of RAM."
+    },
+    {
+      "id": "qwen2.5-coder-32b",
+      "aliases": [
+        "qwen2.5-coder:32b"
+      ],
+      "name": "Qwen2.5-Coder 32B Instruct (Q4_K_M)",
+      "family": "qwen2.5-coder",
+      "file": "Qwen2.5-Coder-32B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/Qwen2.5-Coder-32B-Instruct-GGUF/resolve/main/Qwen2.5-Coder-32B-Instruct-Q4_K_M.gguf",
+      "size": 19851336672,
+      "sha256": "8e2fd78ff55e7cdf577fda257bac2776feb7d73d922613caf35468073807e815",
+      "params_b": 32.8,
+      "active_params_b": 32.8,
+      "tier": 3,
+      "layers": 64,
+      "context_k": 32,
+      "kv_cache_mb_8k": 2048,
+      "tools": true,
+      "license": "Apache-2.0",
+      "summary": "The strongest dense coder here, best for careful conversions; every word uses all 32B parameters, so it is very slow on a CPU. Needs 32 GB+."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "log-diagnosis",
+      "name": "Log root-cause diagnosis",
+      "workload": "knowledge base",
+      "context_tokens": 8192,
+      "no_workload_hint": "Build or open a knowledge base and the advisor will tell you whether your code base is large enough for a bigger model to be worth downloading.",
+      "tiers": [
+        {
+          "label": "small",
+          "below": {
+            "lines": 15000,
+            "symbols": 1500
+          },
+          "explain": "A small model can follow a code base of this size.",
+          "prefer": [
+            "qwen2.5-coder-1.5b",
+            "qwen2.5-coder-3b",
+            "gemma-3-4b"
+          ]
+        },
+        {
+          "label": "medium",
+          "below": {
+            "lines": 150000,
+            "symbols": 15000
+          },
+          "explain": "At this size a 7B model reasons noticeably better about how the parts fit together.",
+          "prefer": [
+            "qwen2.5-coder-7b",
+            "deepseek-coder-v2-lite",
+            "llama-3.1-8b",
+            "gemma-3-12b",
+            "qwen2.5-coder-3b",
+            "qwen2.5-coder-1.5b"
+          ]
+        },
+        {
+          "label": "large",
+          "explain": "A large code base benefits from the strongest model this PC can run.",
+          "prefer": [
+            "qwen3-coder-30b-a3b",
+            "qwen2.5-coder-32b",
+            "qwen2.5-coder-14b",
+            "phi-4",
+            "deepseek-coder-v2-lite",
+            "qwen2.5-coder-7b",
+            "qwen2.5-coder-3b",
+            "qwen2.5-coder-1.5b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "code-conversion",
+      "name": "Code conversion (e.g. C++ to C#, Python 2 to 3)",
+      "workload": "source to convert",
+      "context_tokens": 16384,
+      "no_workload_hint": "Point the advisor at the source to convert and it will size the model to the largest file, which has to fit in the model's context together with its translation.",
+      "tiers": [
+        {
+          "label": "small",
+          "below": {
+            "largest_file_lines": 300,
+            "lines": 5000
+          },
+          "explain": "Short files convert well with a 7B model; a 1.5B model tends to drop details when rewriting code.",
+          "prefer": [
+            "qwen2.5-coder-7b",
+            "deepseek-coder-v2-lite",
+            "qwen3-coder-30b-a3b",
+            "llama-3.1-8b"
+          ]
+        },
+        {
+          "label": "medium",
+          "below": {
+            "largest_file_lines": 1200
+          },
+          "explain": "Files of this length need a model that keeps the whole file consistent while rewriting it.",
+          "prefer": [
+            "qwen3-coder-30b-a3b",
+            "qwen2.5-coder-32b",
+            "qwen2.5-coder-14b",
+            "deepseek-coder-v2-lite",
+            "phi-4",
+            "qwen2.5-coder-7b"
+          ]
+        },
+        {
+          "label": "large",
+          "explain": "Some files are longer than the context window: they are converted in pieces, so the strongest model helps keep the pieces consistent.",
+          "prefer": [
+            "qwen3-coder-30b-a3b",
+            "qwen2.5-coder-32b",
+            "qwen2.5-coder-14b",
+            "deepseek-coder-v2-lite",
+            "phi-4",
+            "qwen2.5-coder-7b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "binary-renaming",
+      "name": "Naming decompiled functions (RevEng Studio refiner)",
+      "workload": "binary",
+      "context_tokens": 16384,
+      "parallel": 3,
+      "needs_tools": true,
+      "start_small": false,
+      "tiers": [
+        {
+          "label": "",
+          "explain": "Renaming quality grows with model size: the largest model that runs on the GPU is suggested.",
+          "prefer": [
+            "qwen2.5-coder-32b",
+            "qwen3-coder-30b-a3b",
+            "devstral-small-24b",
+            "qwen2.5-coder-14b",
+            "qwen2.5-coder-7b",
+            "qwen2.5-coder-3b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rename-review",
+      "name": "Reviewing proposed names (RevEng Studio reviewer)",
+      "workload": "binary",
+      "context_tokens": 16384,
+      "parallel": 1,
+      "needs_tools": true,
+      "start_small": false,
+      "tiers": [
+        {
+          "label": "",
+          "explain": "A second model gives an independent opinion.",
+          "prefer": [
+            "qwen2.5-coder-32b",
+            "qwen3-coder-30b-a3b",
+            "devstral-small-24b",
+            "gpt-oss-20b",
+            "qwen3-14b",
+            "qwen2.5-coder-14b",
+            "qwen3-8b",
+            "qwen2.5-coder-7b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "triage-planning",
+      "name": "Triage and planning (RevEng Studio planner)",
+      "workload": "binary",
+      "context_tokens": 8192,
+      "parallel": 1,
+      "needs_tools": true,
+      "start_small": true,
+      "tiers": [
+        {
+          "label": "",
+          "explain": "A small, fast model is enough to plan work.",
+          "prefer": [
+            "qwen2.5-coder-3b",
+            "llama-3.1-8b",
+            "qwen3-8b",
+            "gpt-oss-20b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "embeddings",
+      "name": "Similarity search (embeddings)",
+      "workload": "code",
+      "context_tokens": 2048,
+      "parallel": 1,
+      "start_small": true,
+      "tiers": [
+        {
+          "label": "",
+          "explain": "Embeddings for finding similar code.",
+          "prefer": [
+            "nomic-embed-text-v1.5"
+          ]
+        }
+      ]
+    }
+  ]
+}

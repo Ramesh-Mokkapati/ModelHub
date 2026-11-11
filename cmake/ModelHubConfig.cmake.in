@@ -1,0 +1,60 @@
+# ModelHub SDK for CMake projects:
+#
+#   find_package(ModelHub CONFIG REQUIRED PATHS <ModelHub>/build/sdk)
+#   target_link_libraries(MyApp PRIVATE ModelHub::Sdk)   # modelhub.h / modelhub.hpp, ModelHubSdk.dll
+#   modelhub_deploy(MyApp)                                # copies the DLL and catalog.json next to MyApp.exe
+#
+# Variables: MODELHUB_SDK_DIR, MODELHUB_SDK_CATALOG (catalog.json), MODELHUB_SDK_LLAMA_DIR (llama.cpp's server),
+# MODELHUB_SDK_HUB_EXE (the ModelHub service, Release build when there is one).
+# The DLL has a plain C interface, so an application's Debug build may use the Release DLL and the other way
+# round: when one configuration of the SDK is missing, the other is used.
+
+get_filename_component(MODELHUB_SDK_DIR "${CMAKE_CURRENT_LIST_DIR}" ABSOLUTE)
+set(MODELHUB_SDK_VERSION "@PROJECT_VERSION@")
+set(MODELHUB_SDK_CATALOG "${MODELHUB_SDK_DIR}/bin/catalog.json")
+set(MODELHUB_SDK_LLAMA_DIR "${MODELHUB_SDK_DIR}/bin/llama")
+
+set(_mh_any "")
+foreach(_mh_cfg Release Debug)
+  if(EXISTS "${MODELHUB_SDK_DIR}/bin/${_mh_cfg}/ModelHubSdk.dll" AND NOT _mh_any)
+    set(_mh_any ${_mh_cfg})
+  endif()
+endforeach()
+if(NOT _mh_any)
+  set(ModelHub_FOUND FALSE)
+  set(ModelHub_NOT_FOUND_MESSAGE "ModelHub SDK at ${MODELHUB_SDK_DIR} has no built ModelHubSdk.dll: build ModelHub first")
+  return()
+endif()
+set(MODELHUB_SDK_HUB_EXE "${MODELHUB_SDK_DIR}/bin/${_mh_any}/ModelHub.exe")
+
+if(NOT TARGET ModelHub::Sdk)
+  add_library(ModelHub::Sdk SHARED IMPORTED)
+  set_target_properties(ModelHub::Sdk PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${MODELHUB_SDK_DIR}/include"
+    IMPORTED_CONFIGURATIONS "DEBUG;RELEASE"
+    MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+    MAP_IMPORTED_CONFIG_MINSIZEREL Release)
+  foreach(_mh_cfg Debug Release)
+    string(TOUPPER ${_mh_cfg} _mh_CFG)
+    set(_mh_dir ${_mh_cfg})
+    if(NOT EXISTS "${MODELHUB_SDK_DIR}/bin/${_mh_cfg}/ModelHubSdk.dll")
+      set(_mh_dir ${_mh_any})
+    endif()
+    set_target_properties(ModelHub::Sdk PROPERTIES
+      IMPORTED_LOCATION_${_mh_CFG} "${MODELHUB_SDK_DIR}/bin/${_mh_dir}/ModelHubSdk.dll"
+      IMPORTED_IMPLIB_${_mh_CFG} "${MODELHUB_SDK_DIR}/lib/${_mh_dir}/ModelHubSdk.lib")
+  endforeach()
+endif()
+
+# Copies ModelHubSdk.dll and catalog.json next to <target>'s executable on every build (also when only the
+# SDK changed and the target itself is up to date).
+function(modelhub_deploy target)
+  add_custom_target(${target}_modelhub_deploy ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${target}>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:ModelHub::Sdk>" "${MODELHUB_SDK_CATALOG}"
+            "$<TARGET_FILE_DIR:${target}>"
+    COMMENT "ModelHub SDK -> $<TARGET_FILE_DIR:${target}>"
+    VERBATIM)
+  add_dependencies(${target} ${target}_modelhub_deploy)
+endfunction()
+set(ModelHub_FOUND TRUE)

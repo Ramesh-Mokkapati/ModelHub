@@ -1,0 +1,7 @@
+# Normalise line endings in the repository; Windows scripts and Visual Studio files keep CRLF on checkout.
+* text=auto
+*.ps1 text eol=crlf
+*.rc text eol=crlf
+*.sln text eol=crlf
+*.zip binary
+*.gguf binary

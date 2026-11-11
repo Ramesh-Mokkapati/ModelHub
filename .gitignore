@@ -1,0 +1,41 @@
+# Build output (CMake / Visual Studio); build\sdk is staged by every build
+build/
+build-*/
+out/
+dist/
+.vs/
+*.user
+*.aps
+CMakeSettings.json
+CMakeUserPresets.json
+
+# vcpkg (manifest mode installs into the build folder; this is for a manual install next to the sources)
+vcpkg_installed/
+
+# Downloaded llama.cpp archives (cmake/Llama.cmake downloads and verifies them again)
+.downloads/
+
+# Local GGUF models (hundreds of MB to GBs) and interrupted downloads
+models/
+*.gguf
+*.gguf.part
+
+# Python (scripts/merge_catalogs.py)
+__pycache__/
+*.pyc
+
+# Crash dumps, logs and temporary files
+*.dmp
+*.stackdump
+*.log
+*.tmp
+
+# Editors and operating systems
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# CI: vcpkg binary cache
+.vcpkg-cache/

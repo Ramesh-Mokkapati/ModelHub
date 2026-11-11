@@ -1,0 +1,43 @@
+# Code style for ModelHub's sources. Visual Studio picks this up automatically
+# (Tools > Options > Text Editor > C/C++ > Code Style > Formatting: "Use ClangFormat").
+BasedOnStyle: Microsoft
+Language: Cpp
+Standard: c++14
+
+# Allman: every opening brace on its own line.
+BreakBeforeBraces: Allman
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+# 0 = keep the existing line breaks (lines are kept under ~120 characters by hand).
+ColumnLimit: 0
+# Wrapped arguments use a plain 4-space continuation indent, not alignment under the bracket.
+AlignAfterOpenBracket: DontAlign
+ContinuationIndentWidth: 4
+AlignConsecutiveMacros: Consecutive
+# Constructor initializers one per line with a leading comma; spaces inside braced lists.
+BreakConstructorInitializers: BeforeComma
+PackConstructorInitializers: Never
+Cpp11BracedListStyle: false
+# MFC message maps: indent the ON_... entries between BEGIN_MESSAGE_MAP and END_MESSAGE_MAP.
+MacroBlockBegin: "^BEGIN_MESSAGE_MAP$"
+MacroBlockEnd: "^END_MESSAGE_MAP$"
+
+# Matches the existing layout: namespace contents indented, access specifiers at class level,
+# function bodies never squeezed onto one line.
+NamespaceIndentation: All
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+# Trivial one-statement lambdas may stay on one line: [this](...) { Post(kStatus, msg); }
+AllowShortLambdasOnASingleLine: All
+
+# Keep hand-made alignment of trailing comments and avoid reshuffling includes and declarations.
+AlignTrailingComments:
+  Kind: Leave
+SortIncludes: Never
+ReflowComments: false
+PointerAlignment: Left
+SpacesBeforeTrailingComments: 2

@@ -1,0 +1,138 @@
+# Builds and tests ModelHub on every pull request and push to main. A push to main also tags the next version
+# (scripts\next_version.ps1: feat -> minor, "!" or BREAKING CHANGE -> major, else patch) and publishes a GitHub
+# release with the SDK zip (DLL, import library, headers, ModelHub.exe, ModelHubManager.exe, catalog, llama.cpp,
+# ModelHubConfig.cmake).
+# "[skip release]" in the commit message builds and tests without releasing.
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Runs on main queue one after another, so each one sees the tag the previous one made.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+
+jobs:
+  build:
+    runs-on: windows-latest   # CMake picks the newest Visual Studio on the image (2026 or 2022 both work)
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # all tags and history, for the next version
+
+      - name: Work out the next version
+        id: version
+        shell: pwsh
+        run: ./scripts/next_version.ps1
+
+      - name: Prepare vcpkg
+        shell: pwsh
+        run: |
+          # The image's vcpkg must contain the builtin-baseline commit from vcpkg.json.
+          $vcpkg = $env:VCPKG_INSTALLATION_ROOT
+          $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          git -C $vcpkg cat-file -e "$baseline^{commit}" 2>$null
+          if ($LASTEXITCODE -ne 0) { git -C $vcpkg fetch --quiet origin; if ($LASTEXITCODE -ne 0) { exit 1 } }
+          New-Item -ItemType Directory -Force $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          "VCPKG_ROOT=$vcpkg" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v6
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-${{ runner.os }}-
+
+      - name: Cache llama.cpp archives
+        uses: actions/cache@v6
+        with:
+          path: .downloads
+          key: llama-${{ hashFiles('cmake/Llama.cmake') }}
+
+      - name: Configure
+        shell: pwsh
+        # Quoted: PowerShell splits an unquoted -DNAME=0.2.0 at the dot.
+        run: >
+          cmake -S . -B build -A x64
+          "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          "-DVCPKG_TARGET_TRIPLET=x64-windows-static-md"
+          "-DMODELHUB_VERSION=${{ steps.version.outputs.version }}"
+          "-DMODELHUB_BUILD_NUMBER=${{ github.run_number }}"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        shell: pwsh
+        run: build/bin/Release/ModelHubTests.exe --gtest_output=xml:build/test-results.xml
+
+      - name: Check the version in the binaries
+        shell: pwsh
+        run: |
+          $want = "${{ steps.version.outputs.version }}"
+          foreach ($file in "build/bin/Release/ModelHubSdk.dll", "build/bin/Release/ModelHub.exe", "build/bin/Release/ModelHubManager.exe") {
+            $got = (Get-Item $file).VersionInfo.ProductVersion
+            if ($got -ne $want) { throw "$file is version '$got', expected '$want'" }
+          }
+
+      - name: Package
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --target package
+          $name = "ModelHub-${{ steps.version.outputs.version }}-win64"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Move-Item "build/$name.zip" dist/
+          $hash = (Get-FileHash "dist/$name.zip" -Algorithm SHA256).Hash.ToLower()
+          Set-Content "dist/$name.zip.sha256" "$hash  $name.zip" -Encoding ascii -NoNewline
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: test-results
+          path: build/test-results.xml
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ModelHub-${{ steps.version.outputs.version }}-win64
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.build.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # create the tag and the release
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ModelHub-${{ needs.build.outputs.version }}-win64
+          path: dist
+
+      - name: Tag and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          gh release create "$TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "ModelHub $TAG" \
+            --generate-notes \
+            --notes "The ModelHub SDK for Windows x64. Unzip it and point find_package(ModelHub CONFIG PATHS <folder>) at the folder, or run bin/Release/ModelHubManager.exe to pick, download and delete models and to start or stop the ModelHub service from the notification area. Includes llama.cpp's llama-server (Vulkan). Models are not included: they are downloaded on demand."
