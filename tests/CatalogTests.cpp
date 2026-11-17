@@ -13,7 +13,7 @@ TEST(Catalog, ShippedCatalogParsesAndCoversBothApplications)
         << err;
     EXPECT_GE(c.models.size(), 15u);
     for (const char* task : { "log-diagnosis", "code-conversion", "binary-renaming", "rename-review", "triage-planning",
-             "embeddings" })
+             "embeddings", "port-x64", "port-unicode", "port-linux" })
         EXPECT_NE(c.FindTask(task), nullptr) << task;
     // RevEng's Ollama-style ids still resolve, to the same model AppAssist uses.
     const CatalogModel* m = c.Find("qwen2.5-coder:7b");

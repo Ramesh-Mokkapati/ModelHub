@@ -464,6 +464,9 @@ generated once with `scripts/merge_catalogs.py` and is edited by hand from then 
 | --- | --- | --- | --- |
 | `log-diagnosis` | AppAssist | 8K | Starts small; grows with lines and symbols. |
 | `code-conversion` | AppAssist | 16K | Sized by the largest file. |
+| `port-x64` | PortAssistAI | 16K | Small, local pointer-size fixes: 7B first, 3B for the easy ones. |
+| `port-unicode` | PortAssistAI | 16K | Mostly mechanical; text vs. bytes needs 14B or a strong 7B. |
+| `port-linux` | PortAssistAI | 16K | Win32 to POSIX rewrites: the strongest model that fits. |
 | `binary-renaming` | RevEng refiner | 16K × 3 slots, tool calling | Largest model on the GPU. |
 | `rename-review` | RevEng reviewer | 16K, tool calling | Largest model on the GPU. |
 | `triage-planning` | RevEng planner | 8K | Small and fast. |

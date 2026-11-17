@@ -496,6 +496,110 @@
       ]
     },
     {
+      "id": "port-x64",
+      "name": "Porting C++ from Win32 to x64 (PortAssistAI)",
+      "workload": "source to port",
+      "context_tokens": 16384,
+      "no_workload_hint": "Point the advisor at the project to port: the fixes are small edits next to the compiler's messages, so a 7B model handles most of them.",
+      "tiers": [
+        {
+          "label": "small",
+          "below": {
+            "largest_file_lines": 1200
+          },
+          "explain": "Pointer-size fixes (casts, _PTR types, size_t, the *Ptr window functions) are small, local edits beside the compiler's message: a 7B model handles most of them and a 3B model the easy ones.",
+          "prefer": [
+            "qwen2.5-coder-7b",
+            "qwen2.5-coder-3b",
+            "deepseek-coder-v2-lite",
+            "qwen3-coder-30b-a3b",
+            "qwen2.5-coder-14b"
+          ]
+        },
+        {
+          "label": "large",
+          "explain": "Long files are shown to the model in windows around the messages; a 14B model keeps the types consistent across them.",
+          "prefer": [
+            "qwen2.5-coder-14b",
+            "qwen3-coder-30b-a3b",
+            "qwen2.5-coder-7b",
+            "deepseek-coder-v2-lite",
+            "qwen2.5-coder-3b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "port-unicode",
+      "name": "Porting C++ from MBCS to Unicode (PortAssistAI)",
+      "workload": "source to port",
+      "context_tokens": 16384,
+      "no_workload_hint": "Point the advisor at the project to port: most changes are mechanical, but telling text from bytes needs a mid-size model.",
+      "tiers": [
+        {
+          "label": "small",
+          "below": {
+            "largest_file_lines": 1200
+          },
+          "explain": "Most Unicode fixes are mechanical, but telling text from bytes (buffer sizes in characters, file and network data that stays char) needs a 14B model or a strong 7B one.",
+          "prefer": [
+            "qwen2.5-coder-14b",
+            "qwen3-coder-30b-a3b",
+            "qwen2.5-coder-7b",
+            "deepseek-coder-v2-lite",
+            "phi-4"
+          ]
+        },
+        {
+          "label": "large",
+          "explain": "Long files mix text and byte buffers across many functions: the strongest model that fits keeps them apart.",
+          "prefer": [
+            "qwen3-coder-30b-a3b",
+            "qwen2.5-coder-32b",
+            "qwen2.5-coder-14b",
+            "deepseek-coder-v2-lite",
+            "qwen2.5-coder-7b"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "port-linux",
+      "name": "Porting Windows C++ to Linux (PortAssistAI)",
+      "workload": "source to port",
+      "context_tokens": 16384,
+      "no_workload_hint": "Point the advisor at the project to port: replacing Win32 calls is a rewrite, so the strongest model that fits is suggested.",
+      "tiers": [
+        {
+          "label": "small",
+          "below": {
+            "lines": 5000
+          },
+          "explain": "Replacing Win32 calls with POSIX and standard C++ is a rewrite, not a local fix, and every attempt costs a container build: the strongest model that fits helps most.",
+          "prefer": [
+            "qwen3-coder-30b-a3b",
+            "qwen2.5-coder-14b",
+            "qwen2.5-coder-32b",
+            "devstral-small-24b",
+            "deepseek-coder-v2-lite",
+            "qwen2.5-coder-7b"
+          ]
+        },
+        {
+          "label": "large",
+          "explain": "A large program uses more of the Windows API: the largest model that fits knows more of its POSIX equivalents.",
+          "prefer": [
+            "qwen2.5-coder-32b",
+            "qwen3-coder-30b-a3b",
+            "devstral-small-24b",
+            "qwen2.5-coder-14b",
+            "deepseek-coder-v2-lite",
+            "qwen2.5-coder-7b"
+          ]
+        }
+      ]
+    },
+    {
       "id": "binary-renaming",
       "name": "Naming decompiled functions (RevEng Studio refiner)",
       "workload": "binary",
