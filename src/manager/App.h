@@ -14,7 +14,8 @@
 
 #include "HubCore.h"
 
-namespace mgr {
+namespace mgr
+{
 
 constexpr UINT WM_APP_TRAY = WM_APP + 1;         // tray icon events
 constexpr UINT WM_APP_SERVICE = WM_APP + 2;      // lParam: ServiceInfo* (the receiver deletes it)
@@ -22,33 +23,44 @@ constexpr UINT WM_APP_ACTION_DONE = WM_APP + 3;  // lParam: ActionResult* (the r
 constexpr UINT WM_APP_SHOW = WM_APP + 4;         // a second start of the program: show the manager
 constexpr UINT WM_APP_WORK_DONE = WM_APP + 5;    // manager window: lParam: WorkResult* (the receiver deletes it)
 
-enum class ServiceState { Unknown, Stopped, Starting, Running, Stopping };
+enum class ServiceState
+{
+    Unknown,
+    Stopped,
+    Starting,
+    Running,
+    Stopping
+};
 
-struct ServiceInfo {
+struct ServiceInfo
+{
     ServiceState state = ServiceState::Unknown;
     int port = 0;
     std::string version;
     int servers = 0;  // llama-servers it has running
 };
 
-struct ActionResult {
+struct ActionResult
+{
     bool ok = true;
     std::wstring message;
 };
 
-struct App {
+struct App
+{
     HINSTANCE inst = nullptr;
     HWND tray = nullptr;  // hidden window that owns the tray icon
     std::unique_ptr<modelhub::HubCore> core;
     std::string coreError;  // why the core could not start (no catalog, ...)
     ServiceInfo service;
     std::wstring downloadSummary;  // for the tray tooltip, "" when nothing downloads
-    std::atomic<int> workers{0};   // worker threads using core: exit waits for them
+    std::atomic<int> workers{ 0 };   // worker threads using core: exit waits for them
 };
 App& TheApp();
 
 // Held by a worker thread while it uses TheApp().core.
-struct WorkerGuard {
+struct WorkerGuard
+{
     WorkerGuard();
     ~WorkerGuard();
     WorkerGuard(const WorkerGuard&) = delete;

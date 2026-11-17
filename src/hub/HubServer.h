@@ -33,16 +33,19 @@
 
 #include "Config.h"  // HubConfig, LoadHubConfig, SaveHubConfig
 
-namespace modelhub {
+namespace modelhub
+{
 
-struct HubOptions {
+struct HubOptions
+{
     std::filesystem::path home;                       // models\, manifest.json, hub.json
     std::vector<std::filesystem::path> catalogFiles;  // first that parses wins
     HubConfig config;
     bool writeHubInfo = true;                         // hub.json for clients (tests may turn it off)
 };
 
-class Hub {
+class Hub
+{
 public:
     explicit Hub(HubOptions opt);
     ~Hub();

@@ -18,7 +18,10 @@ project(ModelHub VERSION ${MODELHUB_VERSION} LANGUAGES CXX RC)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+# The programs and their DLLs: <source>bin<Config> (next to the sources, as in RevEng Studio); CMake's own files and
+# the staged SDK (buildsdk) stay in the build folder.
+set(MODELHUB_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/bin" CACHE PATH "Where ModelHub.exe, ModelHubManager.exe, ModelHubSdk.dll and the tests are built")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${MODELHUB_OUTPUT_DIR})
 
 if(NOT WIN32)
   message(FATAL_ERROR "ModelHub currently targets Windows.")
@@ -54,6 +57,7 @@ add_library(ModelHubCore STATIC
   src/core/Store.cpp
   src/core/Downloader.cpp
   src/core/ServerPool.cpp
+  src/core/Lessons.cpp
   src/core/HubCore.cpp
 )
 target_include_directories(ModelHubCore PUBLIC src/core)
@@ -74,6 +78,9 @@ add_executable(ModelHub src/hub/main.cpp src/hub/ModelHub.rc)
 target_link_libraries(ModelHub PRIVATE ModelHubService winhttp)
 add_custom_command(TARGET ModelHub POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/config/catalog.json $<TARGET_FILE_DIR:ModelHub>/catalog.json)
+# Playbooks shipped with the hub: copied to <home>/lessons the first time (never over what applications added).
+add_custom_command(TARGET ModelHub POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different ${CMAKE_SOURCE_DIR}/docs/lessons $<TARGET_FILE_DIR:ModelHub>/lessons)
 target_include_directories(ModelHub PRIVATE src/manager)  # the icon (res/modelhub.ico)
 
 # ---------------------------------------------------------------- ModelHubManager.exe (tray + model manager)
@@ -127,11 +134,14 @@ add_executable(ModelHubTests
   tests/SdkTests.cpp
   tests/LlamaTests.cpp
   tests/HfBrowseTests.cpp
+  tests/LessonTests.cpp
 )
 target_link_libraries(ModelHubTests PRIVATE ModelHubService ModelHubCxx14Check ModelHubSdk GTest::gtest GTest::gtest_main)
 target_compile_definitions(ModelHubTests PRIVATE MODELHUB_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
                                                  MODELHUB_BINARY_DIR="${CMAKE_BINARY_DIR}")
 include(GoogleTest)
+# ModelHub.sln (VS 2022) / ModelHub.slnx (VS 2026) at the root of the sources.
+include(cmake/RootSolution.cmake)
 gtest_discover_tests(ModelHubTests DISCOVERY_MODE PRE_TEST)
 
 # ---------------------------------------------------------------- install + package (the SDK layout)

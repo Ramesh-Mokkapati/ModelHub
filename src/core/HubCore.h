@@ -24,6 +24,13 @@
 //   delete_model  {model, recycle?=true}    deletes every copy of a model (to the Recycle Bin by default) and its
 //                                           partial download; refuses while it downloads here
 //
+//   lessons_add   {domain, records:[{key, ...}] | record, app?}   what an application learned (a fix that worked), kept in
+//                                           home/lessons/<domain>.jsonl for every application using the hub
+//   lessons_query {domain, keys?, model?, limit?=50}    lessons for those keys (all when none), newest first
+//   lessons_stats {domain?}                 counts per domain and key
+//   playbook      {domain}                  the domain's how-to text (home/lessons/<domain>.md)
+//   playbook_add  {domain, section?, text, app?}   extends it unless the text is already there
+//
 // Errors come back as {"error": {"message", "type"}, "status": <HTTP-like code>}.
 #include <atomic>
 #include <filesystem>
@@ -40,13 +47,16 @@
 #include "Catalog.h"
 #include "Config.h"
 #include "Downloader.h"
+#include "Lessons.h"
 #include "Hardware.h"
 #include "ServerPool.h"
 #include "Store.h"
 
-namespace modelhub {
+namespace modelhub
+{
 
-struct CoreOptions {
+struct CoreOptions
+{
     std::filesystem::path home;                         // models\, manifest.json, config.json, custom_models.json
     std::vector<std::filesystem::path> catalogFiles;    // first that parses wins
     HubConfig config;                                   // usually LoadHubConfig(home\config.json)
@@ -54,10 +64,12 @@ struct CoreOptions {
     std::string app;                                    // default user for "model" and "server_start"
     bool scanOnInit = true;                             // check model files in the background at Init
     std::string hfBase = "https://huggingface.co";      // tests point this at a local mirror
+    std::filesystem::path lessonSeedDir;                // playbooks copied to home/lessons when missing (default: lessons folder beside the exe)
     std::function<void(const std::string&)> log;
 };
 
-class HubCore {
+class HubCore
+{
 public:
     explicit HubCore(CoreOptions opt);
     ~HubCore();
@@ -73,12 +85,27 @@ public:
 
     // For the HTTP layer.
     std::shared_ptr<const Catalog> CatalogSnapshot() const;
-    ModelStore& Store() { return *store_; }
-    ServerPool& Pool() { return *pool_; }
-    bool Scanning() const { return scanning_; }
+    ModelStore& Store()
+    {
+        return *store_;
+    }
+    ServerPool& Pool()
+    {
+        return *pool_;
+    }
+    bool Scanning() const
+    {
+        return scanning_;
+    }
     void StartScan();
-    const HardwareInfo& Hardware() const { return hw_; }
-    const CoreOptions& Options() const { return opt_; }
+    const HardwareInfo& Hardware() const
+    {
+        return hw_;
+    }
+    const CoreOptions& Options() const
+    {
+        return opt_;
+    }
 
     static nlohmann::json Error(int status, const std::string& message, const std::string& type = "hub_error");
 
@@ -104,11 +131,12 @@ private:
     std::shared_ptr<const Catalog> catalog_;
     std::string catalogErrors_;
     std::unique_ptr<ModelStore> store_;
+    std::unique_ptr<LessonStore> lessons_;
     std::unique_ptr<DownloadManager> downloads_;
     std::unique_ptr<ServerPool> pool_;
     std::mutex pinMu_;
     std::map<std::string, ServerPool::Lease> pinned_;  // servers kept for the life of this object
-    std::atomic<bool> scanning_{false}, rescanPending_{false};
+    std::atomic<bool> scanning_{ false }, rescanPending_{ false };
     std::jthread scanThread_;
     std::mutex scanMu_;
     mutable std::mutex stateMu_;

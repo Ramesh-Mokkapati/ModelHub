@@ -9,6 +9,11 @@ Everything local-LLM applications on a Windows PC share about models and llama.c
 - **Advice.** Which model fits this PC's graphics memory, RAM and disk, and the size of the job.
 - **Downloads.** They resume after interruptions, are verified before use, and never run twice for the same
   file on one PC.
+- **Lessons.** What applications learn while fixing things is shared: records per key (`lessons_add`,
+  `lessons_query`, `lessons_stats`) in `%LOCALAPPDATA%\ModelHub\lessons\<domain>.jsonl`, and a playbook per
+  domain (`playbook`, `playbook_add`) in `<domain>.md`. Files in `docs/lessons` are copied there when missing,
+  so a new install starts with what earlier projects taught (`reveng-fix.jsonl`: 119 fixes for MSVC and javac
+  errors; `reveng-stitch-lessons.md`: how to reproduce and fix stitched projects).
 - **llama.cpp.** The pinned, verified `llama-server` build, and servers started on demand (GPU layers chosen
   from the free graphics memory).
 
@@ -22,6 +27,49 @@ It comes in four parts, all built from one core (`src/core`, `HubCore`):
 | `ModelHubSdk.dll` | In the application's own process: model selection, store, downloads, custom models, llama.cpp servers. A plain C interface (`include/modelhub/modelhub.h`, JSON in and out) with a header-only C++14 wrapper (`modelhub.hpp`). |
 | `ModelHub.exe` | The service: the same core over HTTP on `127.0.0.1`, plus a command line (see below). |
 | llama.cpp | `llama-server` b11938, downloaded and verified at configure time. |
+
+### Architecture
+
+```mermaid
+flowchart LR
+  subgraph apps["Applications"]
+    A1["RevEng Studio (C++20)"]
+    A2["AppAssist (C++14)"]
+    A3["Any other program"]
+  end
+  subgraph proc["In the application's process"]
+    SDK["ModelHubSdk.dll<br/>C ABI + JSON, C++14 wrapper"]
+  end
+  subgraph svc["ModelHub.exe (optional service, 127.0.0.1)"]
+    HTTP["HTTP: /hub/v1, OpenAI-compatible /v1"]
+  end
+  subgraph core["HubCore (src/core), one JSON command set"]
+    Cat["Catalog + Advisor + Hardware"]
+    Sto["Store + Downloader + HfBrowse"]
+    Srv["ServerPool"]
+    Les["Lessons"]
+  end
+  Mgr["ModelHubManager.exe<br/>tray, model manager, Hugging Face browser"]
+  Home[("LOCALAPPDATA/ModelHub<br/>models, manifest.json, config.json,<br/>custom_models.json, lessons")]
+  Llama["llama-server (one per model and context)"]
+  HF["huggingface.co"]
+  A1 --> SDK
+  A2 --> SDK
+  A3 -- HTTP --> HTTP
+  A1 -. shared servers .-> HTTP
+  SDK --> core
+  HTTP --> core
+  Mgr --> core
+  Cat --> Home
+  Sto --> Home
+  Les --> Home
+  Sto --> HF
+  Srv --> Llama
+```
+
+Every part is a front end of the same `HubCore`, so a command behaves the same in a process, over HTTP and in the
+manager. What is shared between applications lives in one folder, `%LOCALAPPDATA%\ModelHub`, under cross-process
+locks: the model files and their manifest, the custom models, and the lessons.
 
 ### What the service (`ModelHub.exe`) does
 
@@ -131,11 +179,20 @@ cmake --build --preset release
 Running the tests:
 
 ```bash
-build\bin\Release\ModelHubTests.exe
+bin\Release\ModelHubTests.exe
 ```
+
+Where things go: the programs (`ModelHub.exe`, `ModelHubManager.exe`, `ModelHubSdk.dll`, the tests) are built into
+`bin\<Config>\` at the root of the sources (`-DMODELHUB_OUTPUT_DIR=...` changes it; the `vs2022-x64` preset uses
+`bin-vs2022`). CMake's own files and the staged SDK stay in `build\`. Configuring also writes `ModelHub.sln` (the
+classic format, Visual Studio 2022 and later) and `ModelHub.slnx` (Visual Studio 2026) at the root, with
+`ModelHub` as the startup project; configure again after adding a project. `bin\`, `bin-*\` and both solution
+files are build output (in `.gitignore`).
 
 They cover:
 
+- the shared lessons: appending, de-duplication, queries by key and model, several writers at once, the
+  playbook, seeding, and the commands over the DLL core and over HTTP;
 - the DLL through its C interface and the C++14 wrapper: two "applications" sharing one store; downloads that
   resume, are cancelled or wait for another process; custom models; deleting every copy of a model;
 - the HTTP service, including deleting over HTTP;
@@ -183,14 +240,17 @@ Local builds are version 0.1.0 unless you pass `-DMODELHUB_VERSION=<version>`.
 
 | Path | Contents |
 | --- | --- |
-| `src/core/` | `HubCore` and everything it uses: catalog, advisor, hardware, store, downloader, llama.cpp servers, Hugging Face browsing (`HfBrowse`) |
+| `src/core/` | `HubCore` and everything it uses: catalog, advisor, hardware, store, downloader, llama.cpp servers, Hugging Face browsing (`HfBrowse`), shared lessons (`Lessons`) |
 | `src/sdk/` | `ModelHubSdk.dll` (the C interface over `HubCore`) |
 | `src/hub/` | `ModelHub.exe` (the HTTP service over `HubCore`) |
 | `src/manager/` | `ModelHubManager.exe` (tray icon, model manager and Hugging Face browser, Win32); icons in `res/` (`scripts/make_icons.py`) |
 | `docs/images/` | the screenshots in this README |
+| `docs/lessons/` | lessons shipped with ModelHub: `reveng-fix.jsonl` (119 fixes for compiler errors) and `reveng-stitch-lessons.md` (a playbook) |
+| `bin/`, `bin-vs2022/` | build output (not in git): the programs |
+| `.clang-format` | the code style (Allman braces, 4 spaces; Visual Studio applies it with "Use ClangFormat") |
 | `include/modelhub/` | the public headers (C, C++14 wrapper, service client) |
 | `config/catalog.json` | the catalog: models and task profiles |
-| `cmake/` | llama.cpp download and the `ModelHubConfig.cmake` template |
+| `cmake/` | llama.cpp download, the `ModelHubConfig.cmake` template, `RootSolution.cmake` (`ModelHub.sln` / `.slnx` at the root) |
 | `scripts/` | `next_version.ps1` (release versions), `make_icons.py`, `merge_catalogs.py` |
 | `tests/` | GoogleTest tests |
 | `.github/workflows/` | build, test and release |
@@ -249,6 +309,10 @@ Commands (`mh_call(hub, method, args)`; the same commands serve the HTTP service
 | `hf_search` | `query`, `kind` (`text`, `code`, `embeddings`), `sort` (`downloads`, `trending`, `likes`, `updated`), `limit` | GGUF models on Hugging Face, each with category, best use, parameters, architecture, licence and how a Q4_K_M file would run here |
 | `hf_repo` | `repo` | one repository: best use, description, notes, every GGUF file judged for this PC (fit, speed, quality, compatible or why not, installed), and the recommended file |
 | `hf_add` | `repo`, `file` | adds that file as a custom model (then `mh_download` it) |
+| `lessons_add` | `domain`, `records` or `record` (each with a `key`), `app` | appends what an application learned to `lessons\<domain>.jsonl`; identical records (same key, model, removed, added) are skipped; answers `added`, `skipped`, `total` |
+| `lessons_query` | `domain`, `keys`, `model`, `limit` (default 50) | the records for those keys (all when none), newest first, the asking model's own first |
+| `lessons_stats` | `domain` (optional) | records per domain and key, and whether a playbook exists |
+| `playbook`, `playbook_add` | `domain`; `section`, `text`, `app` | the domain's how-to text (`lessons\<domain>.md`), and extending it (nothing is added twice) |
 | `delete_model` | `model`, `recycle` (default true) | deletes every copy of the model and its partial download, after stopping this process's servers of it; refuses while it downloads here; lists what was deleted, what failed (a file in use) and who used it |
 
 `mh_download(hub, model, progress, user)` downloads on the calling thread. It reports progress as
@@ -285,6 +349,7 @@ without a GPU recommends `qwen3-coder-30b-a3b`.
 | `config.json` | Shared settings: service port (default 39281), `search_dirs`, `llama_server`, `idle_minutes` (10), `parallel` slots (2), `base_port` (39300), `llama_args`. |
 | `catalog.json` | Optional. Overrides the catalog shipped next to `ModelHub.exe` / `ModelHubSdk.dll`. |
 | `custom_models.json` | Models applications added (`add_model`). |
+| `lessons\` | What applications learned: `<domain>.jsonl` (one record per line) and `<domain>.md` (a playbook). Shared by every process; writes hold a machine-wide lock. Files in the repository's `docs/lessons` (shipped in a `lessons` folder next to `ModelHub.exe`) are copied here when missing and never overwrite what applications added. |
 | `manifest.json` | Every model file found, with its hash, whether it is verified, and which applications use it. Shared by every process; changes are made under a machine-wide lock after re-reading it, and each process picks up the others' changes. |
 | `hub.json` | The running hub's port and access token. It is removed when the hub stops. |
 | `install.json` | Where `ModelHub.exe` is, so clients can start it. |
@@ -318,6 +383,8 @@ Every request except `GET /health` needs `Authorization: Bearer <token from hub.
 | `DELETE /hub/v1/models/{id}` | Deletes every copy of a model (`?recycle=false`: delete instead of recycling); stops its llama-server first. |
 | `POST /hub/v1/servers/{id}/start` | `{"task" or "context_tokens", "parallel"}`: loads the model now and answers when it is ready, so the first chat request is not slow. |
 | `POST /hub/v1/servers/{id}/stop` | Stops a model's idle llama-server. |
+| `POST /hub/v1/lessons/add`, `/lessons/query`, `/lessons/stats`; `GET /hub/v1/lessons/stats?domain=` | The `lessons_*` commands. |
+| `GET /hub/v1/playbook/{domain}`, `POST /hub/v1/playbook/{domain}` | The `playbook` and `playbook_add` commands. |
 | `POST /hub/v1/shutdown` | Stops the hub. |
 | `GET /v1/models`, `POST /v1/chat/completions`, `/v1/completions`, `/v1/embeddings` | OpenAI-compatible; see below. |
 

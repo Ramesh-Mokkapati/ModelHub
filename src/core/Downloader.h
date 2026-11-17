@@ -14,22 +14,26 @@
 
 #include "Catalog.h"
 
-namespace modelhub {
+namespace modelhub
+{
 
-struct DownloadProgress {
+struct DownloadProgress
+{
     std::string phase;  // "downloading", "verifying", "done", "failed", "cancelled"
     uint64_t done = 0, total = 0;
     double bytesPerSecond = 0;
 };
 
 bool DownloadFile(const CatalogFile& f, const std::filesystem::path& dir,
-                  const std::function<void(const DownloadProgress&)>& onProgress, std::stop_token stop,
-                  std::string* error);
+    const std::function<void(const DownloadProgress&)>& onProgress, std::stop_token stop,
+    std::string* error);
 
 // Background downloads, one per model at a time. Thread-safe.
-class DownloadManager {
+class DownloadManager
+{
 public:
-    struct Status {
+    struct Status
+    {
         std::string modelId;
         DownloadProgress progress;
         std::string error;
@@ -38,7 +42,11 @@ public:
     // Called on the download thread when a file is complete and verified.
     using DoneFn = std::function<void(const CatalogModel&, const CatalogFile&, const std::filesystem::path&)>;
 
-    DownloadManager(std::filesystem::path dir, DoneFn onDone) : dir_(std::move(dir)), onDone_(std::move(onDone)) {}
+    DownloadManager(std::filesystem::path dir, DoneFn onDone)
+        : dir_(std::move(dir))
+        , onDone_(std::move(onDone))
+    {
+    }
     ~DownloadManager();
 
     bool Start(const CatalogModel& m, std::string* error);  // false if already running

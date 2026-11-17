@@ -20,17 +20,20 @@
 #include "Hardware.h"
 #include "ProcessRunner.h"
 
-namespace modelhub {
+namespace modelhub
+{
 
-struct ServerPoolOptions {
+struct ServerPoolOptions
+{
     std::filesystem::path llamaServer;  // llama-server.exe
     int basePort = 39300;               // llama-server ports start here (the hub's own port is separate)
-    std::chrono::seconds idleTimeout{600};
+    std::chrono::seconds idleTimeout{ 600 };
     int defaultParallel = 2;            // slots per server
     std::vector<std::wstring> extraArgs;
 };
 
-class ServerPool {
+class ServerPool
+{
 public:
     using LogFn = std::function<void(const std::string&)>;
     ServerPool(ServerPoolOptions opt, HardwareInfo hw, LogFn log);
@@ -39,26 +42,45 @@ public:
     ServerPool& operator=(const ServerPool&) = delete;
 
     // Keeps a server busy (not stopped for idleness or memory) while held.
-    class Lease {
+    class Lease
+    {
     public:
         Lease() = default;
-        Lease(Lease&& o) noexcept : pool_(o.pool_), key_(std::move(o.key_)), url_(std::move(o.url_)) { o.pool_ = nullptr; }
+        Lease(Lease&& o) noexcept
+            : pool_(o.pool_)
+            , key_(std::move(o.key_))
+            , url_(std::move(o.url_))
+        {
+            o.pool_ = nullptr;
+        }
         Lease& operator=(Lease&&) = delete;
         ~Lease();
-        explicit operator bool() const { return pool_ != nullptr; }
-        const std::string& BaseUrl() const { return url_; }  // http://127.0.0.1:<port>
+        explicit operator bool() const
+        {
+            return pool_ != nullptr;
+        }
+        const std::string& BaseUrl() const
+        {
+            return url_;
+        }  // http://127.0.0.1:<port>
     private:
         friend class ServerPool;
-        Lease(ServerPool* p, std::string k, std::string u) : pool_(p), key_(std::move(k)), url_(std::move(u)) {}
+        Lease(ServerPool* p, std::string k, std::string u)
+            : pool_(p)
+            , key_(std::move(k))
+            , url_(std::move(u))
+        {
+        }
         ServerPool* pool_ = nullptr;
         std::string key_, url_;
     };
 
     // Starts (or reuses) a server for the model file. contextTokens is per request (slot); 0 = 8192.
     Lease Acquire(const CatalogModel& m, const std::filesystem::path& gguf, int contextTokens, int parallel,
-                  std::stop_token stop, std::string* error);
+        std::stop_token stop, std::string* error);
 
-    struct Info {
+    struct Info
+    {
         std::string modelId;
         int port = 0, gpuLayers = 0, contextTokens = 0, parallel = 0, active = 0;
         uint32_t pid = 0;
@@ -70,12 +92,13 @@ public:
     void StopAll();
 
     static std::vector<std::wstring> BuildArgs(const std::filesystem::path& gguf, int port, int parallel,
-                                               int contextTokens, int gpuLayers, const std::string& alias,
-                                               bool embeddings, const std::string& device);
+        int contextTokens, int gpuLayers, const std::string& alias,
+        bool embeddings, const std::string& device);
     static std::string ChooseDevice(const std::vector<std::string>& listDevicesOutput, const std::string& gpuName);
 
 private:
-    struct Server {
+    struct Server
+    {
         std::string modelId;
         std::unique_ptr<ManagedProcess> proc;
         int port = 0, gpuLayers = 0, contextTokens = 0, parallel = 0, active = 0;

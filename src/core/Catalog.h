@@ -14,16 +14,19 @@
 #include <string>
 #include <vector>
 
-namespace modelhub {
+namespace modelhub
+{
 
-struct CatalogFile {
+struct CatalogFile
+{
     std::string file;    // file name on disk
     std::string url;     // https download URL
     uint64_t size = 0;   // exact bytes
     std::string sha256;  // lower-case hex
 };
 
-struct CatalogModel {
+struct CatalogModel
+{
     std::string id;                    // e.g. "qwen2.5-coder-7b"
     std::vector<std::string> aliases;  // other names apps use, e.g. "qwen2.5-coder:7b"
     std::string name;
@@ -40,19 +43,27 @@ struct CatalogModel {
     std::string license;
     std::string summary;
 
-    const CatalogFile& Primary() const { return files.front(); }
-    uint64_t SizeBytes() const { return files.empty() ? 0 : files.front().size; }
+    const CatalogFile& Primary() const
+    {
+        return files.front();
+    }
+    uint64_t SizeBytes() const
+    {
+        return files.empty() ? 0 : files.front().size;
+    }
     bool Matches(const std::string& idOrAlias) const;
 };
 
-struct TaskTier {
+struct TaskTier
+{
     std::string label;
     std::map<std::string, double> below;  // every listed metric must be below its limit; empty = catch-all
     std::string explain;
     std::vector<std::string> prefer;      // model ids, best first
 };
 
-struct TaskProfile {
+struct TaskProfile
+{
     std::string id;           // "log-diagnosis", "binary-renaming", ...
     std::string name;
     std::string workloadNoun;
@@ -67,7 +78,8 @@ struct TaskProfile {
     bool UsesModel(const std::string& id) const;
 };
 
-struct Catalog {
+struct Catalog
+{
     std::vector<CatalogModel> models;  // smallest first
     std::vector<TaskProfile> tasks;
     std::string source;                // file it came from

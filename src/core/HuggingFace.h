@@ -6,12 +6,17 @@
 
 #include "Catalog.h"
 
-namespace modelhub {
+namespace modelhub
+{
 
-struct HfFile {
+struct HfFile
+{
     std::string repo;  // owner/name
     std::string file;  // in the repository root
-    std::string Url() const { return "https://huggingface.co/" + repo + "/resolve/main/" + file; }
+    std::string Url() const
+    {
+        return "https://huggingface.co/" + repo + "/resolve/main/" + file;
+    }
 };
 
 // "owner/repo/file.gguf", "hf:owner/repo/file.gguf" or a huggingface.co/.../(resolve|blob)/main/file.gguf URL.

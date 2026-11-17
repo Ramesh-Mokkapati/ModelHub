@@ -23,9 +23,9 @@ Cpp11BracedListStyle: false
 MacroBlockBegin: "^BEGIN_MESSAGE_MAP$"
 MacroBlockEnd: "^END_MESSAGE_MAP$"
 
-# Matches the existing layout: namespace contents indented, access specifiers at class level,
+# Namespace contents are not indented; access specifiers sit at class level,
 # function bodies never squeezed onto one line.
-NamespaceIndentation: All
+NamespaceIndentation: None
 AccessModifierOffset: -4
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: Never

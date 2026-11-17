@@ -6,12 +6,19 @@
 #include <string_view>
 #include <vector>
 
-namespace modelhub {
+namespace modelhub
+{
 
 std::wstring Widen(std::string_view utf8);
 std::string Narrow(std::wstring_view wide);
-inline std::string PathToUtf8(const std::filesystem::path& p) { return Narrow(p.wstring()); }
-inline std::filesystem::path Utf8ToPath(std::string_view s) { return std::filesystem::path(Widen(s)); }
+inline std::string PathToUtf8(const std::filesystem::path& p)
+{
+    return Narrow(p.wstring());
+}
+inline std::filesystem::path Utf8ToPath(std::string_view s)
+{
+    return std::filesystem::path(Widen(s));
+}
 
 std::string Trim(std::string_view s);
 std::string ToLower(std::string_view s);
@@ -22,7 +29,7 @@ std::vector<std::string> SplitLines(std::string_view s);
 
 // Replaces {key} placeholders. Unknown placeholders are left as is.
 std::string ExpandTemplate(std::string_view tmpl, const std::map<std::string, std::string>& vars,
-                           std::string_view open = "{", std::string_view close = "}");
+    std::string_view open = "{", std::string_view close = "}");
 
 // Splits a command line the way Windows programs parse argv (CommandLineToArgvW rules).
 std::vector<std::wstring> SplitCommandLine(std::wstring_view cmd);

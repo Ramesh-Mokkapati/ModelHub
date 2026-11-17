@@ -30,19 +30,20 @@
 #define MODELHUB_API_VERSION 1
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-typedef struct mh_hub mh_hub;
+    typedef struct mh_hub mh_hub;
 
 /* Log lines (UTF-8), from any thread. */
-typedef void(MH_CALL* mh_log_fn)(void* user, const char* line);
+    typedef void(MH_CALL* mh_log_fn)(void* user, const char* line);
 /* Download progress: {"model","phase","done","total","bytes_per_second"}. Return non-zero to cancel. */
-typedef int(MH_CALL* mh_progress_fn)(void* user, const char* progress_json);
+    typedef int(MH_CALL* mh_progress_fn)(void* user, const char* progress_json);
 
 /* "0.1.0" (static string). */
-MH_API const char* MH_CALL mh_version(void);
-MH_API int MH_CALL mh_api_version(void);
+    MH_API const char* MH_CALL mh_version(void);
+    MH_API int MH_CALL mh_api_version(void);
 
 /* Opens the shared store. options (JSON, may be NULL or "{}"):
  *   app           this application's name (recorded as a user of the models it asks for)
@@ -54,17 +55,17 @@ MH_API int MH_CALL mh_api_version(void);
  *   scan          false: do not check model files in the background now
  * Checking model files runs in the background: "model" answers status 503 while it runs, "wait_scan" waits.
  * On failure returns NULL and, if error is not NULL, a message to release with mh_free. */
-MH_API mh_hub* MH_CALL mh_open(const char* options_json, mh_log_fn log, void* log_user, char** error);
+    MH_API mh_hub* MH_CALL mh_open(const char* options_json, mh_log_fn log, void* log_user, char** error);
 /* Stops the llama-servers this handle started and releases it. */
-MH_API void MH_CALL mh_close(mh_hub* hub);
+    MH_API void MH_CALL mh_close(mh_hub* hub);
 
 /* Runs one command; args_json may be NULL. Returns JSON to release with mh_free. Thread-safe. */
-MH_API char* MH_CALL mh_call(mh_hub* hub, const char* method, const char* args_json);
+    MH_API char* MH_CALL mh_call(mh_hub* hub, const char* method, const char* args_json);
 /* Downloads a model into the shared store on the calling thread (blocking; resumes partial files; waits if
  * another process is downloading the same file). Returns the model's JSON (with "path") or an error. */
-MH_API char* MH_CALL mh_download(mh_hub* hub, const char* model, mh_progress_fn progress, void* user);
+    MH_API char* MH_CALL mh_download(mh_hub* hub, const char* model, mh_progress_fn progress, void* user);
 
-MH_API void MH_CALL mh_free(char* text);
+    MH_API void MH_CALL mh_free(char* text);
 
 #ifdef __cplusplus
 }

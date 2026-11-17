@@ -10,24 +10,30 @@
 #include <string_view>
 #include <vector>
 
-namespace modelhub {
+namespace modelhub
+{
 
-struct ProcessSpec {
+struct ProcessSpec
+{
     std::wstring exe;                        // full path or a name resolved through PATH (.exe/.cmd/.bat)
     std::vector<std::wstring> args;
     std::filesystem::path workDir;           // empty = current directory
     std::map<std::wstring, std::wstring> env;  // added to / overriding the parent environment
     uint64_t memoryLimitMB = 0;              // per-process limit via Job Object, 0 = none
-    std::chrono::seconds timeout{0};         // 0 = no timeout (RunProcess only)
+    std::chrono::seconds timeout{ 0 };         // 0 = no timeout (RunProcess only)
 };
 
-struct ProcessResult {
+struct ProcessResult
+{
     int exitCode = -1;
     bool launchFailed = false;
     bool timedOut = false;
     bool cancelled = false;
     std::string error;
-    bool Succeeded() const { return !launchFailed && !timedOut && !cancelled && exitCode == 0; }
+    bool Succeeded() const
+    {
+        return !launchFailed && !timedOut && !cancelled && exitCode == 0;
+    }
 };
 
 // Called once per output line (without the line break), from reader threads, serialized.
@@ -47,7 +53,8 @@ bool LaunchDetached(const ProcessSpec& spec, std::string* error);
 ProcessResult RunProcess(const ProcessSpec& spec, const LineCallback& onLine, std::stop_token stop = {});
 
 // A long-running child (Ghidra server, MCP bridge). Killed with its whole tree on Terminate/destruction.
-class ManagedProcess {
+class ManagedProcess
+{
 public:
     ManagedProcess();
     ~ManagedProcess();

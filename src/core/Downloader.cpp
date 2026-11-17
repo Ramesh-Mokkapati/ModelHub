@@ -10,14 +10,18 @@
 #include "Paths.h"
 #include "Text.h"
 
-namespace modelhub {
+namespace modelhub
+{
 
 namespace fs = std::filesystem;
 
 bool DownloadFile(const CatalogFile& f, const fs::path& dir, const std::function<void(const DownloadProgress&)>& onProgress,
-                  std::stop_token stop, std::string* error) {
-    auto fail = [&](const std::string& msg) {
-        if (error) *error = msg;
+    std::stop_token stop, std::string* error)
+{
+    auto fail = [&](const std::string& msg)
+    {
+        if (error)
+            *error = msg;
         return false;
     };
     std::error_code ec;
@@ -28,23 +32,32 @@ bool DownloadFile(const CatalogFile& f, const fs::path& dir, const std::function
 
     // One download of a file at a time on this PC: another application (or the hub) may be fetching it.
     HANDLE lock = CreateMutexW(nullptr, FALSE, (L"Local\\ModelHub-download-" + Widen(f.sha256.substr(0, 16))).c_str());
-    struct Release {
+    struct Release
+    {
         HANDLE h;
         bool owned = false;
-        ~Release() {
-            if (h && owned) ReleaseMutex(h);
-            if (h) CloseHandle(h);
+        ~Release()
+        {
+            if (h && owned)
+                ReleaseMutex(h);
+            if (h)
+                CloseHandle(h);
         }
-    } release{lock};
-    if (lock) {
-        for (bool told = false;;) {
+    } release{ lock };
+    if (lock)
+    {
+        for (bool told = false;;)
+        {
             DWORD w = WaitForSingleObject(lock, 500);
-            if (w == WAIT_OBJECT_0 || w == WAIT_ABANDONED) {
+            if (w == WAIT_OBJECT_0 || w == WAIT_ABANDONED)
+            {
                 release.owned = true;
                 break;
             }
-            if (stop.stop_requested()) return fail("cancelled");
-            if (!told && onProgress) onProgress({"waiting", 0, f.size, 0});  // another process is downloading it
+            if (stop.stop_requested())
+                return fail("cancelled");
+            if (!told && onProgress)
+                onProgress({ "waiting", 0, f.size, 0 });  // another process is downloading it
             told = true;
         }
     }
@@ -52,7 +65,8 @@ bool DownloadFile(const CatalogFile& f, const fs::path& dir, const std::function
         return true;  // already there (perhaps just finished by another process)
 
     uint64_t have = fs::exists(part, ec) ? fs::file_size(part, ec) : 0;
-    if (have > f.size) {
+    if (have > f.size)
+    {
         fs::remove(part, ec);
         have = 0;
     }
@@ -62,59 +76,80 @@ bool DownloadFile(const CatalogFile& f, const fs::path& dir, const std::function
 
     auto started = std::chrono::steady_clock::now();
     uint64_t startedAt = have;
-    auto report = [&](const std::string& phase, uint64_t done) {
-        if (!onProgress) return;
-        DownloadProgress p{phase, done, f.size, 0};
+    auto report = [&](const std::string& phase, uint64_t done)
+    {
+        if (!onProgress)
+            return;
+        DownloadProgress p{ phase, done, f.size, 0 };
         double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-        if (secs > 0.5 && done > startedAt) p.bytesPerSecond = (done - startedAt) / secs;
+        if (secs > 0.5 && done > startedAt)
+            p.bytesPerSecond = (done - startedAt) / secs;
         onProgress(p);
     };
 
-    for (int attempt = 0; attempt < 6; ++attempt) {
-        if (stop.stop_requested()) return fail("cancelled (the partial download resumes next time)");
+    for (int attempt = 0; attempt < 6; ++attempt)
+    {
+        if (stop.stop_requested())
+            return fail("cancelled (the partial download resumes next time)");
         have = fs::exists(part, ec) ? fs::file_size(part, ec) : 0;
-        if (have == f.size) break;
+        if (have == f.size)
+            break;
         HttpHeaders headers;
-        if (have) headers.emplace_back("Range", "bytes=" + std::to_string(have) + "-");
+        if (have)
+            headers.emplace_back("Range", "bytes=" + std::to_string(have) + "-");
         std::ofstream out;
         uint64_t done = have, lastReport = 0;
         bool rangeDone = false;
         HttpResponse r = HttpRequestStream(
             "GET", f.url, {}, headers, 60000,
-            [&](std::string_view chunk) {
+            [&](std::string_view chunk)
+            {
                 out.write(chunk.data(), static_cast<std::streamsize>(chunk.size()));
-                if (!out) return false;
+                if (!out)
+                    return false;
                 done += chunk.size();
-                if (done - lastReport >= (4u << 20)) {
+                if (done - lastReport >= (4u << 20))
+                {
                     lastReport = done;
                     report("downloading", done);
                 }
                 return !stop.stop_requested();
             },
             stop,
-            [&](const HttpResponse& h) {
-                if (h.status == 416 && have) {  // nothing left to fetch
+            [&](const HttpResponse& h)
+            {
+                if (h.status == 416 && have)
+                {  // nothing left to fetch
                     rangeDone = true;
                     return false;
                 }
-                if (h.status == 206) {
+                if (h.status == 206)
+                {
                     out.open(part, std::ios::binary | std::ios::app);
-                } else if (h.status == 200) {
+                }
+                else if (h.status == 200)
+                {
                     done = 0;  // the server ignored the range: start over
                     out.open(part, std::ios::binary | std::ios::trunc);
-                } else {
+                }
+                else
+                {
                     return false;
                 }
                 return static_cast<bool>(out);
             });
         out.close();
-        if (rangeDone) break;
-        if (r.cancelled && stop.stop_requested()) return fail("cancelled (the partial download resumes next time)");
+        if (rangeDone)
+            break;
+        if (r.cancelled && stop.stop_requested())
+            return fail("cancelled (the partial download resumes next time)");
         if (r.status == 401 || r.status == 403)
             return fail("the server refused the download (HTTP " + std::to_string(r.status) +
                         "): the repository may be gated or private");
-        if (r.status == 404) return fail("file not found: " + f.url);
-        if (r.error.empty() && (r.status == 200 || r.status == 206) && fs::file_size(part, ec) == f.size) break;
+        if (r.status == 404)
+            return fail("file not found: " + f.url);
+        if (r.error.empty() && (r.status == 200 || r.status == 206) && fs::file_size(part, ec) == f.size)
+            break;
         for (int i = 0; i < 4 * (attempt + 1) && !stop.stop_requested(); ++i)  // back off, then resume
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
@@ -125,39 +160,48 @@ bool DownloadFile(const CatalogFile& f, const fs::path& dir, const std::function
                     " bytes); it resumes next time");
     report("verifying", have);
     std::string actual = Sha256File(part);
-    if (actual != f.sha256) {
+    if (actual != f.sha256)
+    {
         fs::remove(part, ec);
         return fail("SHA-256 mismatch: expected " + f.sha256 + ", got " + actual + " (file removed)");
     }
     fs::rename(part, target, ec);
-    if (ec) return fail("cannot move the finished download into place: " + ec.message());
+    if (ec)
+        return fail("cannot move the finished download into place: " + ec.message());
     report("done", have);
     return true;
 }
 
-DownloadManager::~DownloadManager() {
+DownloadManager::~DownloadManager()
+{
     std::map<std::string, std::jthread> threads;
     {
         std::lock_guard lk(mu_);
         threads.swap(threads_);
     }
-    for (auto& [_, t] : threads) t.request_stop();
+    for (auto& [_, t] : threads)
+        t.request_stop();
     // jthreads join here
 }
 
-bool DownloadManager::Start(const CatalogModel& m, std::string* error) {
+bool DownloadManager::Start(const CatalogModel& m, std::string* error)
+{
     std::lock_guard lk(mu_);
-    if (auto it = status_.find(m.id); it != status_.end() && it->second.running) {
-        if (error) *error = "already downloading";
+    if (auto it = status_.find(m.id); it != status_.end() && it->second.running)
+    {
+        if (error)
+            *error = "already downloading";
         return false;
     }
-    if (auto t = threads_.find(m.id); t != threads_.end()) {
+    if (auto t = threads_.find(m.id); t != threads_.end())
+    {
         t->second.join();  // a finished thread: reap it
         threads_.erase(t);
     }
-    status_[m.id] = Status{m.id, {"starting", 0, m.SizeBytes(), 0}, {}, true};
+    status_[m.id] = Status{ m.id, { "starting", 0, m.SizeBytes(), 0 }, {}, true };
     CatalogModel model = m;
-    threads_.emplace(m.id, std::jthread([this, model](std::stop_token stop) {
+    threads_.emplace(m.id, std::jthread([this, model](std::stop_token stop)
+                               {
         std::string err;
         const CatalogFile& f = model.Primary();
         bool ok = DownloadFile(
@@ -173,23 +217,26 @@ bool DownloadManager::Start(const CatalogModel& m, std::string* error) {
         s.running = false;
         s.error = err;
         s.progress.phase = ok ? "done" : stop.stop_requested() ? "cancelled" : "failed";
-        if (ok) s.progress.done = s.progress.total;
-    }));
+        if (ok) s.progress.done = s.progress.total; }));
     return true;
 }
 
-bool DownloadManager::Cancel(const std::string& modelId) {
+bool DownloadManager::Cancel(const std::string& modelId)
+{
     std::lock_guard lk(mu_);
     auto t = threads_.find(modelId);
-    if (t == threads_.end()) return false;
+    if (t == threads_.end())
+        return false;
     t->second.request_stop();
     return true;
 }
 
-std::vector<DownloadManager::Status> DownloadManager::List() const {
+std::vector<DownloadManager::Status> DownloadManager::List() const
+{
     std::lock_guard lk(mu_);
     std::vector<Status> v;
-    for (const auto& [_, s] : status_) v.push_back(s);
+    for (const auto& [_, s] : status_)
+        v.push_back(s);
     return v;
 }
 

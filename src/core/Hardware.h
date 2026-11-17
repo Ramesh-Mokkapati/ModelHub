@@ -2,9 +2,11 @@
 #include <cstdint>
 #include <string>
 
-namespace modelhub {
+namespace modelhub
+{
 
-struct HardwareInfo {
+struct HardwareInfo
+{
     std::string gpuName;      // empty = no discrete GPU
     uint64_t vramMB = 0;      // dedicated video memory of the largest GPU (0 for integrated GPUs)
     uint64_t ramMB = 0;       // physical memory

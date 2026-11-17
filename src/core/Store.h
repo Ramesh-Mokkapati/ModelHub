@@ -17,9 +17,11 @@
 
 #include "Catalog.h"
 
-namespace modelhub {
+namespace modelhub
+{
 
-struct InstalledFile {
+struct InstalledFile
+{
     std::string modelId;
     std::string file;
     std::string sha256;
@@ -29,18 +31,23 @@ struct InstalledFile {
     std::vector<std::string> users;  // applications that asked for it
 };
 
-struct ScanResult {
+struct ScanResult
+{
     int verified = 0;   // files hashed during this scan
     int found = 0;      // verified files known after the scan
     int rejected = 0;   // right name and size, wrong hash
 };
 
-class ModelStore {
+class ModelStore
+{
 public:
     ModelStore(std::filesystem::path modelsDir, std::filesystem::path manifest,
-               std::vector<std::filesystem::path> searchDirs);
+        std::vector<std::filesystem::path> searchDirs);
 
-    const std::filesystem::path& ModelsDir() const { return modelsDir_; }
+    const std::filesystem::path& ModelsDir() const
+    {
+        return modelsDir_;
+    }
     std::vector<std::filesystem::path> SearchDirs() const;
 
     using ProgressFn = std::function<void(const std::string&)>;
@@ -57,7 +64,8 @@ public:
     bool AddSearchDir(const std::filesystem::path& dir);           // false if already searched
 
 private:
-    struct Entry {
+    struct Entry
+    {
         std::filesystem::path path;
         uint64_t size = 0;
         int64_t mtime = 0;
@@ -73,10 +81,12 @@ private:
     InstalledFile ToInstalled(const Entry& e) const;
 
     // Machine-wide lock for read-modify-write of manifest.json.
-    class ManifestLock {
+    class ManifestLock
+    {
     public:
         explicit ManifestLock(const std::filesystem::path& manifest);
         ~ManifestLock();
+
     private:
         void* mutex_ = nullptr;
     };

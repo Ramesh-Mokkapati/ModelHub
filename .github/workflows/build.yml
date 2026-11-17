@@ -83,13 +83,13 @@ jobs:
 
       - name: Test
         shell: pwsh
-        run: build/bin/Release/ModelHubTests.exe --gtest_output=xml:build/test-results.xml
+        run: bin/Release/ModelHubTests.exe --gtest_output=xml:build/test-results.xml
 
       - name: Check the version in the binaries
         shell: pwsh
         run: |
           $want = "${{ steps.version.outputs.version }}"
-          foreach ($file in "build/bin/Release/ModelHubSdk.dll", "build/bin/Release/ModelHub.exe", "build/bin/Release/ModelHubManager.exe") {
+          foreach ($file in "bin/Release/ModelHubSdk.dll", "bin/Release/ModelHub.exe", "bin/Release/ModelHubManager.exe") {
             $got = (Get-Item $file).VersionInfo.ProductVersion
             if ($got -ne $want) { throw "$file is version '$got', expected '$want'" }
           }

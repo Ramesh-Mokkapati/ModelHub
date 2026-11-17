@@ -6,10 +6,13 @@
 
 using namespace modelhub;
 
-namespace {
+namespace
+{
 
-const Catalog& Shipped() {
-    static Catalog c = [] {
+const Catalog& Shipped()
+{
+    static Catalog c = []
+    {
         Catalog cat;
         std::string err;
         ParseCatalog(ReadTextFile(std::filesystem::path(MODELHUB_SOURCE_DIR) / L"config" / L"catalog.json"), cat, err);
@@ -18,7 +21,8 @@ const Catalog& Shipped() {
     return c;
 }
 
-HardwareInfo Pc(uint64_t ramGB, uint64_t vramGB) {
+HardwareInfo Pc(uint64_t ramGB, uint64_t vramGB)
+{
     HardwareInfo hw;
     hw.ramMB = ramGB * 1024;
     hw.availRamMB = hw.ramMB / 2;
@@ -29,11 +33,13 @@ HardwareInfo Pc(uint64_t ramGB, uint64_t vramGB) {
     return hw;
 }
 
-auto None = [](const CatalogModel&) { return false; };
+auto None = [](const CatalogModel&)
+{ return false; };
 
 }  // namespace
 
-TEST(Advisor, StartsSmallForLogDiagnosisWithoutWorkload) {
+TEST(Advisor, StartsSmallForLogDiagnosisWithoutWorkload)
+{
     const auto& c = Shipped();
     Advice a = Advise(c, *c.FindTask("log-diagnosis"), Pc(16, 0), Engine::EmbeddedCpu, nullptr, "", 0, None);
     ASSERT_NE(a.recommended, nullptr);
@@ -42,10 +48,11 @@ TEST(Advisor, StartsSmallForLogDiagnosisWithoutWorkload) {
     EXPECT_FALSE(a.notes.empty());
 }
 
-TEST(Advisor, LargeWorkloadAsksForTheStrongestModelThatFits) {
+TEST(Advisor, LargeWorkloadAsksForTheStrongestModelThatFits)
+{
     const auto& c = Shipped();
     Workload big;
-    big.metrics = {{"lines", 600000}, {"symbols", 40000}};
+    big.metrics = { { "lines", 600000 }, { "symbols", 40000 } };
     big.summary = "600000 lines";
     Advice roomy = Advise(c, *c.FindTask("log-diagnosis"), Pc(64, 0), Engine::EmbeddedCpu, &big, "qwen2.5-coder-1.5b", 0, None);
     EXPECT_EQ(roomy.recommended->id, "qwen3-coder-30b-a3b");
@@ -58,16 +65,19 @@ TEST(Advisor, LargeWorkloadAsksForTheStrongestModelThatFits) {
     EXPECT_EQ(FitFor(*small.recommended, Pc(16, 0), 8192, 1, Engine::EmbeddedCpu), Fit::Cpu);
 }
 
-TEST(Advisor, RenamingPicksTheLargestModelOnTheGpu) {
+TEST(Advisor, RenamingPicksTheLargestModelOnTheGpu)
+{
     const auto& c = Shipped();
     const TaskProfile& t = *c.FindTask("binary-renaming");
-    for (uint64_t vram : {8, 12, 16, 24}) {
+    for (uint64_t vram : { 8, 12, 16, 24 })
+    {
         HardwareInfo hw = Pc(32, vram);
         Advice a = Advise(c, t, hw, Engine::Hub, nullptr, "", 0, None);
         ASSERT_NE(a.recommended, nullptr) << vram;
         const CatalogModel* expected = nullptr;
         for (const auto& id : t.tiers[0].prefer)
-            if (!expected && FitFor(*c.Find(id), hw, t.contextTokens, t.parallel, Engine::Hub) == Fit::Gpu) expected = c.Find(id);
+            if (!expected && FitFor(*c.Find(id), hw, t.contextTokens, t.parallel, Engine::Hub) == Fit::Gpu)
+                expected = c.Find(id);
         ASSERT_NE(expected, nullptr) << vram;
         EXPECT_EQ(a.recommended->id, expected->id) << vram << " GB";
         EXPECT_EQ(GpuLayersFor(*a.recommended, hw, t.contextTokens, t.parallel), 999);
@@ -77,7 +87,8 @@ TEST(Advisor, RenamingPicksTheLargestModelOnTheGpu) {
     EXPECT_EQ(FitFor(*cpu.recommended, Pc(32, 24), t.contextTokens, t.parallel, Engine::EmbeddedCpu), Fit::Cpu);
 }
 
-TEST(Advisor, PartialOffloadAndDiskAndInstalledState) {
+TEST(Advisor, PartialOffloadAndDiskAndInstalledState)
+{
     const auto& c = Shipped();
     const CatalogModel& big = *c.Find("qwen2.5-coder-32b");
     HardwareInfo hw = Pc(64, 8);
@@ -88,19 +99,22 @@ TEST(Advisor, PartialOffloadAndDiskAndInstalledState) {
 
     const TaskProfile& t = *c.FindTask("code-conversion");
     Workload w;
-    w.metrics = {{"largest_file_lines", 100}, {"lines", 1000}};
+    w.metrics = { { "largest_file_lines", 100 }, { "lines", 1000 } };
     w.summary = "1000 lines";
-    auto installed7b = [](const CatalogModel& m) { return m.id == "qwen2.5-coder-7b"; };
+    auto installed7b = [](const CatalogModel& m)
+    { return m.id == "qwen2.5-coder-7b"; };
     Advice a = Advise(c, t, Pc(32, 0), Engine::EmbeddedCpu, &w, "", 0, installed7b);
     EXPECT_EQ(a.recommended->id, "qwen2.5-coder-7b");
     EXPECT_TRUE(a.recommendedInstalled);
 
     // Too little disk for anything but what is installed.
     Advice disk = Advise(c, *c.FindTask("log-diagnosis"), Pc(64, 0), Engine::EmbeddedCpu, &w, "", 2ull << 30, installed7b);
-    for (const auto& o : disk.options) EXPECT_EQ(o.fitsDisk, o.installed || o.model->SizeBytes() + (1ull << 30) <= (2ull << 30));
+    for (const auto& o : disk.options)
+        EXPECT_EQ(o.fitsDisk, o.installed || o.model->SizeBytes() + (1ull << 30) <= (2ull << 30));
 }
 
-TEST(Advisor, NothingFits) {
+TEST(Advisor, NothingFits)
+{
     const auto& c = Shipped();
     Advice a = Advise(c, *c.FindTask("code-conversion"), Pc(4, 0), Engine::EmbeddedCpu, nullptr, "", 0, None);
     EXPECT_EQ(a.recommended, nullptr);

@@ -4,9 +4,11 @@
 #include <string>
 #include <vector>
 
-namespace modelhub {
+namespace modelhub
+{
 
-struct HubConfig {
+struct HubConfig
+{
     int port = 39281;                                // hub service; 0 = any free port
     std::vector<std::filesystem::path> searchDirs;   // other applications' model folders (shared by everyone)
     std::filesystem::path llamaServer;               // empty = the bundled llama\llama-server.exe

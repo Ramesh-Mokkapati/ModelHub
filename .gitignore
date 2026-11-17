@@ -39,3 +39,18 @@ desktop.ini
 
 # CI: vcpkg binary cache
 .vcpkg-cache/
+
+# Programs (bin\<Config>) and the root solution are generated
+bin/
+bin-*/
+/ModelHub.sln
+/ModelHub.slnx
+
+# MSBuild's default output folder (when a project is built outside the presets) and linker files
+/x64/
+/Debug/
+/Release/
+*.pdb
+*.ilk
+*.exp
+*.obj
