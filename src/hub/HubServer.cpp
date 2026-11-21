@@ -38,7 +38,9 @@ struct Hub::Impl
     std::mutex logMu, waitMu;
     std::condition_variable waitCv;
     bool stopped = false;
-    HANDLE instanceMutex = nullptr;
+    bool wroteHubInfo = false;       // this hub wrote hub.json (and only then removes it)
+    HANDLE instanceMutex = nullptr;  // this home
+    HANDLE machineMutex = nullptr;   // this PC (HubOptions::singleInstance)
 
     void Log(const std::string& line)
     {
@@ -50,7 +52,10 @@ struct Hub::Impl
             fs::path log = opt.home / L"hub.log";
             std::error_code ec;
             if (fs::exists(log, ec) && fs::file_size(log, ec) > (5u << 20))
+            {
                 fs::rename(log, opt.home / L"hub.log.1", ec);
+            }
+
             AppendTextFile(log, l);
         }
         catch (...)
@@ -67,9 +72,13 @@ struct Hub::Impl
             status = j["status"].get<int>();
             j.erase("status");
         }
+
         res.status = status;
         if (j.is_object() && j.contains("retry_after"))
+        {
             res.set_header("Retry-After", std::to_string(j.value("retry_after", 2)));
+        }
+
         res.set_content(j.dump(), "application/json");
     }
     static void Error(httplib::Response& res, int status, const std::string& msg, const std::string& type = "hub_error")
@@ -87,33 +96,55 @@ struct Hub::Impl
     {
         json body = json::parse(req.body, nullptr, false);
         if (!body.is_object())
+        {
             return Error(res, 400, "request body must be a JSON object", "invalid_request_error");
+        }
+
         auto cat = core->CatalogSnapshot();
         std::string name = body.value("model", "");
         const CatalogModel* m = cat->Find(name);
         if (!m)
+        {
             return Error(res, 404, "unknown model '" + name + "': GET /v1/models lists the installed ones",
                 "invalid_request_error");
+        }
+
         auto inst = core->Store().Find(*m);
         if (!inst)
+        {
             return Error(res, 404, "model " + m->id + " is not installed: POST /hub/v1/downloads {\"model\":\"" + m->id + "\"}",
                 "model_not_installed");
+        }
+
         int ctx = 0, parallel = 0;
         if (const TaskProfile* t = cat->FindTask(req.get_header_value("X-ModelHub-Task")))
         {
             ctx = t->contextTokens;
             parallel = t->parallel;
         }
+
         if (std::string c = req.get_header_value("X-ModelHub-Context"); !c.empty())
+        {
             ctx = std::atoi(c.c_str());
+        }
+
         if (std::string c = req.get_header_value("X-ModelHub-Parallel"); !c.empty())
+        {
             parallel = std::atoi(c.c_str());
+        }
+
         if (std::string app = req.get_header_value("X-ModelHub-App"); !app.empty())
+        {
             core->Store().AddUser(*m, app);
+        }
+
         std::string err;
         auto lease = std::make_shared<ServerPool::Lease>(core->Pool().Acquire(*m, inst->path, ctx, parallel, {}, &err));
         if (!*lease)
+        {
             return Error(res, 503, err, "server_unavailable");
+        }
+
         body["model"] = m->id;
         std::string upstream = lease->BaseUrl() + path, payload = body.dump();
         if (body.value("stream", false))
@@ -123,19 +154,26 @@ struct Hub::Impl
                 HttpResponse r = HttpRequestStream("POST", upstream, payload, {{"Content-Type", "application/json"}},
                                                    30 * 60 * 1000,
                                                    [&](std::string_view chunk) { return sink.write(chunk.data(), chunk.size()); });
-                if (!r.Ok() && !r.cancelled) {
+                if (!r.Ok() && !r.cancelled)
+                {
                     std::string e = "data: " +
                                     json({{"error", {{"message", r.error.empty() ? "HTTP " + std::to_string(r.status) : r.error}}}}).dump() +
                                     "\n\n";
                     sink.write(e.data(), e.size());
                 }
+                
                 sink.done();
                 return true; });
+
             return;
         }
+
         HttpResponse r = HttpRequest("POST", upstream, payload, { { "Content-Type", "application/json" } }, 30 * 60 * 1000);
         if (r.status == 0)
+        {
             return Error(res, 502, "llama-server: " + r.error, "server_unavailable");
+        }
+
         res.status = r.status;
         res.set_content(r.body, r.Header("content-type").empty() ? "application/json" : r.Header("content-type").c_str());
     }
@@ -145,17 +183,30 @@ struct Hub::Impl
         http.set_pre_routing_handler([this](const httplib::Request& req, httplib::Response& res)
             {
             std::string host = ToLower(req.get_header_value("Host"));
+        
             if (auto colon = host.rfind(':'); colon != std::string::npos && host.find(']') == std::string::npos)
+            {
                 host.resize(colon);
-            if (host != "127.0.0.1" && host != "localhost") {  // DNS rebinding from a web page
+            }
+            
+            if (host != "127.0.0.1" && host != "localhost")
+            {
+                // DNS rebinding from a web page
                 Error(res, 403, "ModelHub only answers requests addressed to 127.0.0.1 or localhost");
                 return httplib::Server::HandlerResponse::Handled;
             }
-            if (req.path == "/health") return httplib::Server::HandlerResponse::Unhandled;
-            if (req.get_header_value("Authorization") != "Bearer " + token) {
+
+            if (req.path == "/health")
+            {
+                return httplib::Server::HandlerResponse::Unhandled;
+            }
+
+            if (req.get_header_value("Authorization") != "Bearer " + token)
+            {
                 Error(res, 401, "missing or wrong token: read it from hub.json in the ModelHub folder", "authentication_error");
                 return httplib::Server::HandlerResponse::Handled;
             }
+            
             return httplib::Server::HandlerResponse::Unhandled; });
 
         http.Get("/health", [](const httplib::Request&, httplib::Response& res)
@@ -165,6 +216,7 @@ struct Hub::Impl
             http.Get(path, [this, method](const httplib::Request&, httplib::Response& res)
                 { Reply(res, core->Call(method, {})); });
         };
+
         simple("/hub/v1/status", "status");
         simple("/hub/v1/catalog", "catalog");
         simple("/hub/v1/models", "models");
@@ -175,6 +227,7 @@ struct Hub::Impl
             { Reply(res, core->Call("fits", Body(req))); });
         http.Get(R"(/hub/v1/models/(.+))", [this](const httplib::Request& req, httplib::Response& res)
             { Reply(res, core->Call("model", { { "id", req.matches[1].str() }, { "app", req.get_param_value("app") } })); });
+
         // Deletes every copy of a model (Recycle Bin unless ?recycle=false); this hub stops its servers of it first.
         http.Delete(R"(/hub/v1/models/(.+))", [this](const httplib::Request& req, httplib::Response& res)
             { Reply(res, core->Call("delete_model", { { "model", req.matches[1].str() }, { "recycle", req.get_param_value("recycle") != "false" } })); });
@@ -187,6 +240,7 @@ struct Hub::Impl
             json b = Body(req);
             b["app"] = req.get_header_value("X-ModelHub-App");
             Reply(res, core->Call("add_folder", b)); });
+
         // Lessons the applications share: records per key, and a playbook per domain.
         http.Post(R"(/hub/v1/lessons/(add|query|stats))", [this](const httplib::Request& req, httplib::Response& res)
             { Reply(res, core->Call("lessons_" + req.matches[1].str(), Body(req))); });
@@ -203,6 +257,7 @@ struct Hub::Impl
             { Reply(res, core->Call("rescan", {}), 202); });
         http.Post("/hub/v1/resolve", [this](const httplib::Request& req, httplib::Response& res)
             { Reply(res, core->Call("resolve_hf", Body(req))); });
+
         // Hugging Face: search GGUF models, judge one repository's files for this PC, add one of them.
         http.Post("/hub/v1/hf/search", [this](const httplib::Request& req, httplib::Response& res)
             { Reply(res, core->Call("hf_search", Body(req))); });
@@ -212,6 +267,7 @@ struct Hub::Impl
             { Reply(res, core->Call("hf_add", Body(req))); });
         http.Post("/hub/v1/custom-models", [this](const httplib::Request& req, httplib::Response& res)
             { Reply(res, core->Call("add_model", Body(req))); });
+
         // Loads a model now (waits until its llama-server answers), so the first chat request is not slow.
         http.Post(R"(/hub/v1/servers/(.+)/start)", [this](const httplib::Request& req, httplib::Response& res)
             {
@@ -235,6 +291,7 @@ struct Hub::Impl
                 if (core->Store().Find(m))
                     data.push_back({{"id", m.id}, {"object", "model"}, {"owned_by", "modelhub"}, {"aliases", m.aliases}});
             Reply(res, {{"object", "list"}, {"data", data}}); });
+
         for (const char* p : { "/v1/chat/completions", "/v1/completions", "/v1/embeddings" })
         {
             std::string path = p;
@@ -262,21 +319,37 @@ Hub::~Hub()
 {
     Stop();
     if (impl_->httpThread.joinable())
+    {
         impl_->httpThread.join();
+    }
+
     impl_->core.reset();  // stops the llama-servers
-    if (impl_->opt.writeHubInfo)
+
+    // Only the hub that wrote hub.json removes it: a second one that did not start must not hide the running
+    // hub from its clients.
+    if (impl_->wroteHubInfo)
     {
         std::error_code ec;
         fs::remove(impl_->opt.home / L"hub.json", ec);
     }
+
     if (impl_->instanceMutex)
+    {
         CloseHandle(impl_->instanceMutex);
+    }
+
+    if (impl_->machineMutex)
+    {
+        ReleaseMutex(impl_->machineMutex);
+        CloseHandle(impl_->machineMutex);
+    }
 }
 
 int Hub::Port() const
 {
     return impl_->port;
 }
+
 const std::string& Hub::Token() const
 {
     return impl_->token;
@@ -288,9 +361,13 @@ bool Hub::Start(std::string* error)
     auto fail = [&](const std::string& m)
     {
         if (error)
+        {
             *error = m;
+        }
+
         return false;
     };
+
     std::error_code ec;
     fs::create_directories(d.opt.home / L"models", ec);
     if (d.opt.writeHubInfo)
@@ -298,38 +375,120 @@ bool Hub::Start(std::string* error)
         std::wstring name = L"Local\\ModelHub-" + Widen(Sha256(ToLower(PathToUtf8(d.opt.home))).substr(0, 16));
         d.instanceMutex = CreateMutexW(nullptr, TRUE, name.c_str());
         if (d.instanceMutex && GetLastError() == ERROR_ALREADY_EXISTS)
-            return fail("ModelHub is already running for " + PathToUtf8(d.opt.home));
+        {
+            return fail(std::string(kAlreadyRunning) + " for " + PathToUtf8(d.opt.home));
+        }
     }
+
+    if (d.opt.singleInstance)
+    {
+        // Machine-wide, and the same name in every version: whichever ModelHub starts first is the only one.
+        d.machineMutex = CreateMutexW(nullptr, TRUE, L"Global\\ModelHub.Service");
+        DWORD e = GetLastError();
+        if (!d.machineMutex && e == ERROR_ACCESS_DENIED)
+        {
+            return fail(std::string(kAlreadyRunning) + " (in another Windows session)");
+        }
+
+        if (!d.machineMutex)
+        {
+            // no right to create global objects: one per Windows session then
+            d.machineMutex = CreateMutexW(nullptr, TRUE, L"Local\\ModelHub.Service");
+            e = GetLastError();
+        }
+
+        if (d.machineMutex && e == ERROR_ALREADY_EXISTS)
+        {
+            return fail(std::string(kAlreadyRunning) + " on this PC");
+        }
+
+        // Versions from before this check do not hold the mutex: one that answers for this home, or on the
+        // standard port, counts as running too.
+        int ports[] = { 0, 39281 };
+        if (fs::is_regular_file(d.opt.home / L"hub.json", ec))
+        {
+            json j;
+            try
+            {
+                j = json::parse(ReadTextFile(d.opt.home / L"hub.json"), nullptr, false);
+            }
+            catch (const std::exception&)
+            {
+            }
+
+            if (j.is_object())
+            {
+                ports[0] = j.value("port", 0);
+            }
+        }
+
+        for (int port : ports)
+        {
+            if (port <= 0)
+            {
+                continue;
+            }
+
+            HttpResponse r = HttpRequest("GET", "http://127.0.0.1:" + std::to_string(port) + "/health", "", {}, 2000);
+            if (r.status == 200 && r.body.find("\"ok\"") != std::string::npos)
+            {
+                return fail(std::string(kAlreadyRunning) + " at http://127.0.0.1:" + std::to_string(port));
+            }
+        }
+    }
+
     CoreOptions co;
     co.home = d.opt.home;
     co.catalogFiles = d.opt.catalogFiles;
     co.config = d.opt.config;
     if (co.config.llamaServer.empty())
-    {  // bundled: <exe>\llama, or <exe>\..\llama in a multi-config build tree
+    {
+        // bundled: <exe>\llama, or <exe>\..\llama in a multi-config build tree
         co.config.llamaServer = ExeDir() / L"llama" / L"llama-server.exe";
         for (const fs::path& p : { ExeDir().parent_path() / L"llama" / L"llama-server.exe",                      // SDK: bin\<Config>\..
                  ExeDir().parent_path().parent_path() / L"build" / L"sdk" / L"bin" / L"llama" / L"llama-server.exe",           // build tree: <source>bin<Config>
                  ExeDir().parent_path().parent_path() / L"build-vs2022" / L"sdk" / L"bin" / L"llama" / L"llama-server.exe" })
+        {
             if (!fs::exists(co.config.llamaServer, ec))
+            {
                 co.config.llamaServer = p;
+            }
+        }
     }
+
     co.log = [&d](const std::string& s)
     { d.Log(s); };
     d.core = std::make_unique<HubCore>(co);
     std::string err;
     if (!d.core->Init(&err))
+    {
         return fail(err);
+    }
 
     d.token = ReplaceAll(NewGuid() + NewGuid(), "-", "");
     d.http.set_read_timeout(60, 0);
     d.http.set_write_timeout(30 * 60, 0);
     d.Routes();
+
+    // The port is this hub's alone: no other program can bind it as well (httplib's default, SO_REUSEADDR, lets a
+    // second server on Windows share it and take some of its requests).
+    d.http.set_socket_options([](socket_t sock)
+        {
+        BOOL on = TRUE;
+        setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&on), sizeof on); });
     if (d.opt.config.port > 0 && d.http.bind_to_port("127.0.0.1", d.opt.config.port))
+    {
         d.port = d.opt.config.port;
+    }
     else
+    {
         d.port = d.http.bind_to_any_port("127.0.0.1");
+    }
+
     if (d.port <= 0)
+    {
         return fail("cannot listen on 127.0.0.1");
+    }
 
     if (d.opt.writeHubInfo)
     {
@@ -343,9 +502,12 @@ bool Hub::Start(std::string* error)
             { "version", MODELHUB_VERSION },
             { "started", NowIso8601() } };
         WriteTextFile(d.opt.home / L"hub.json", info.dump(2) + "\n");
+        d.wroteHubInfo = true;
+
         // The installed hub's location, for clients that need to start it (kept after the hub exits).
         WriteTextFile(d.opt.home / L"install.json", json({ { "exe", Narrow(std::wstring(exe, n)) } }).dump(2) + "\n");
     }
+
     auto cat = d.core->CatalogSnapshot();
     d.Log("ModelHub " MODELHUB_VERSION " listening on http://127.0.0.1:" + std::to_string(d.port) + "; " +
           Describe(d.core->Hardware()) + "; catalog " + cat->source + " (" + std::to_string(cat->models.size()) +
@@ -369,7 +531,9 @@ void Hub::Wait()
 void Hub::Stop()
 {
     if (impl_->http.is_running())
+    {
         impl_->http.stop();
+    }
 }
 
 }  // namespace modelhub

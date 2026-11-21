@@ -89,7 +89,8 @@ jobs:
         shell: pwsh
         run: |
           $want = "${{ steps.version.outputs.version }}"
-          foreach ($file in "bin/Release/ModelHubSdk.dll", "bin/Release/ModelHub.exe", "bin/Release/ModelHubManager.exe") {
+          foreach ($file in "bin/Release/ModelHubSdk.dll", "bin/Release/ModelHub.exe", "bin/Release/ModelHubManager.exe",
+                            "bin/Release/ModelHubChat.exe") {
             $got = (Get-Item $file).VersionInfo.ProductVersion
             if ($got -ne $want) { throw "$file is version '$got', expected '$want'" }
           }
@@ -140,4 +141,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "ModelHub $TAG" \
             --generate-notes \
-            --notes "The ModelHub SDK for Windows x64. Unzip it and point find_package(ModelHub CONFIG PATHS <folder>) at the folder, or run bin/Release/ModelHubManager.exe to pick, download and delete models and to start or stop the ModelHub service from the notification area. Includes llama.cpp's llama-server (Vulkan). Models are not included: they are downloaded on demand."
+            --notes "The ModelHub SDK for Windows x64. Unzip it and point find_package(ModelHub CONFIG PATHS <folder>) at the folder, or run bin/Release/ModelHubManager.exe to pick, download and delete models and to start or stop the ModelHub service from the notification area. bin/Release/ModelHubChat.exe is a chat window for the local models, with Auto mode (a model chosen for each message), tools, MCP servers, and optional providers such as Claude, OpenAI, GitHub Models and Ollama. Includes llama.cpp's llama-server (Vulkan). Models are not included: they are downloaded on demand."

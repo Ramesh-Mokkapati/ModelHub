@@ -29,22 +29,30 @@ HardwareInfo DetectHardware()
                     hw.gpuName = Narrow(d.Description);
                 }
             }
+
             adapter->Release();
         }
+
         factory->Release();
     }
+
     if (hw.vramMB < 1024)
-    {  // integrated GPUs report a token amount of dedicated memory
+    {
+        // integrated GPUs report a token amount of dedicated memory
         hw.vramMB = 0;
         if (!hw.gpuName.empty())
+        {
             hw.gpuName += " (integrated: treated as CPU)";
+        }
     }
+
     MEMORYSTATUSEX ms{ sizeof ms };
     if (GlobalMemoryStatusEx(&ms))
     {
         hw.ramMB = ms.ullTotalPhys >> 20;
         hw.availRamMB = ms.ullAvailPhys >> 20;
     }
+
     SYSTEM_INFO si;
     GetNativeSystemInfo(&si);
     hw.cores = si.dwNumberOfProcessors;

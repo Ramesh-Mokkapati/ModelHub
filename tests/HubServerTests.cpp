@@ -16,7 +16,7 @@ namespace fs = std::filesystem;
 using nlohmann::json;
 
 namespace cxx14check
-{  // tests/ClientCxx14.cpp, compiled as C++14
+{ // tests/ClientCxx14.cpp, compiled as C++14
 int StatusOfHealth(int port, const std::string& token);
 std::wstring PathViaClient(const std::wstring& home, const std::string& model, std::string* error);
 std::string AdviseViaClient(const std::wstring& home, const std::string& task, const std::string& metrics);
@@ -41,7 +41,10 @@ struct HubFixture : ::testing::Test
         fs::create_directories(otherApp);
         WriteTextFile(otherApp / L"tiny.gguf", small.content);  // another app already has this one
         for (int i = 0; i < 2 * 1024 * 1024; i += 7)
+        {
             remote.content[i] = static_cast<char>('a' + i % 26);
+        }
+
         mirror.files["remote.gguf"] = remote.content;
         std::string tasks = R"([{"id":"chat","name":"Chat","start_small":false,"tiers":[{"prefer":["remote-model","tiny-model"]}]}])";
         fs::create_directories(home);
@@ -51,26 +54,31 @@ struct HubFixture : ::testing::Test
         opt.home = home;
         opt.catalogFiles = { home / L"catalog.json" };
         opt.config.port = 0;
+        opt.singleInstance = false;  // next to the user's own ModelHub
         opt.config.searchDirs = { otherApp };
         opt.config.llamaServer = fs::path(MODELHUB_BINARY_DIR) / L"sdk" / L"bin" / L"llama" / L"llama-server.exe";
         hub = std::make_unique<Hub>(opt);
         std::string err;
         ASSERT_TRUE(hub->Start(&err)) << err;
     }
+
     void TearDown() override
     {
         hub.reset();
         std::error_code ec;
         fs::remove_all(root, ec);
     }
+
     std::string Url(const std::string& path) const
     {
         return "http://127.0.0.1:" + std::to_string(hub->Port()) + path;
     }
+
     HttpHeaders Auth() const
     {
         return { { "Authorization", "Bearer " + hub->Token() } };
     }
+
     json GetJson(const std::string& path)
     {
         auto r = HttpGet(Url(path), Auth(), 10000);
@@ -120,13 +128,19 @@ TEST_F(HubFixture, ApplicationsCanShareTheirModelFolders)
     EXPECT_TRUE(json::parse(r.body)["added"].get<bool>());
     EXPECT_FALSE(json::parse(HttpPost(Url("/hub/v1/folders"), body.dump(), Auth(), 10000).body)["added"].get<bool>());
     json m;
+
     for (int i = 0; i < 100; ++i)
-    {  // 503 while the hub is still checking the new folder
+    {
+        // 503 while the hub is still checking the new folder
         m = json::parse(HttpGet(Url("/hub/v1/models/remote-model"), Auth(), 10000).body, nullptr, false);
         if (m.is_object() && m["installed"].get<bool>())
+        {
             break;
+        }
+
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+
     EXPECT_TRUE(m["installed"].get<bool>());
     EXPECT_EQ(fs::path(Widen(m["path"].get<std::string>())), appFolder / L"remote.gguf");
     EXPECT_EQ(mirror.requests.load(), 0);  // nothing was downloaded
@@ -138,7 +152,10 @@ TEST_F(HubFixture, ApplicationsCanShareTheirModelFolders)
 TEST_F(HubFixture, AdvisesThenDownloadsResumesAndVerifies)
 {
     while (GetJson("/hub/v1/status")["scanning"].get<bool>())
+    {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
     json advice = json::parse(cxx14check::AdviseViaClient(home.wstring(), "chat", ""), nullptr, false);
     ASSERT_TRUE(advice.is_object());
     EXPECT_EQ(advice["recommended"], "remote-model");
@@ -154,9 +171,13 @@ TEST_F(HubFixture, AdvisesThenDownloadsResumesAndVerifies)
     {
         d = GetJson("/hub/v1/downloads")["downloads"][0];
         if (!d["running"].get<bool>())
+        {
             break;
+        }
+
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+
     EXPECT_EQ(d["phase"], "done") << d.dump();
     EXPECT_EQ(ReadTextFile(home / L"models" / L"remote.gguf"), remote.content);
     EXPECT_FALSE(fs::exists(home / L"models" / L"remote.gguf.part"));
@@ -169,7 +190,10 @@ TEST_F(HubFixture, AdvisesThenDownloadsResumesAndVerifies)
 TEST_F(HubFixture, DeletesAModelOverHttp)
 {
     while (GetJson("/hub/v1/status")["scanning"].get<bool>())
+    {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
     ASSERT_TRUE(GetJson("/hub/v1/models/tiny-model")["installed"].get<bool>());
     auto r = HttpRequest("DELETE", Url("/hub/v1/models/tiny-model?recycle=false"), "", Auth(), 10000);
     ASSERT_EQ(r.status, 200) << r.body;
@@ -188,15 +212,41 @@ TEST_F(HubFixture, InferenceErrorsAreOpenAiShaped)
     auto missing = HttpPost(Url("/v1/chat/completions"), R"({"model":"remote-model","messages":[]})", Auth(), 10000);
     EXPECT_EQ(missing.status, 404);
     EXPECT_EQ(json::parse(missing.body)["error"]["type"], "model_not_installed");
+
     // tiny.gguf is not a real model: llama-server starts, fails to load it, and the hub reports why.
     std::string err;
     cxx14check::PathViaClient(home.wstring(), "tiny-model", &err);
     if (!fs::exists(fs::path(MODELHUB_BINARY_DIR) / L"sdk" / L"bin" / L"llama" / L"llama-server.exe"))
+    {
         GTEST_SKIP() << "no llama-server";
+    }
+
     auto broken = HttpPost(Url("/v1/chat/completions"), R"({"model":"tiny-model","messages":[{"role":"user","content":"hi"}]})",
         Auth(), 120000);
     EXPECT_EQ(broken.status, 503) << broken.body;
     EXPECT_NE(broken.body.find("exited while loading"), std::string::npos) << broken.body;
+}
+
+// A second hub for the same home does not start, and leaves the running hub's hub.json alone (it used to remove
+// it on the way out, which hid the running hub from every client).
+TEST_F(HubFixture, SecondHubKeepsTheRunningHubsInfo)
+{
+    ASSERT_TRUE(fs::exists(home / L"hub.json"));
+    std::string before = ReadTextFile(home / L"hub.json");
+    {
+        HubOptions opt;
+        opt.home = home;
+        opt.catalogFiles = { home / L"catalog.json" };
+        opt.config.port = 0;
+        opt.singleInstance = false;
+        Hub second(opt);
+        std::string err;
+        EXPECT_FALSE(second.Start(&err));
+        EXPECT_EQ(err.rfind(kAlreadyRunning, 0), 0u) << err;
+    }
+
+    ASSERT_TRUE(fs::exists(home / L"hub.json"));
+    EXPECT_EQ(ReadTextFile(home / L"hub.json"), before);
 }
 
 // Real inference through the hub (set MODELHUB_IT_MODEL to a GGUF file from the shipped catalog).
@@ -205,13 +255,17 @@ TEST(HubIntegration, ChatThroughTheHub)
     char buf[1024];
     size_t n = 0;
     if (getenv_s(&n, buf, "MODELHUB_IT_MODEL") || n == 0)
+    {
         GTEST_SKIP() << "set MODELHUB_IT_MODEL=<path to a catalog .gguf>";
+    }
+
     fs::path model = Widen(buf);
     auto root = testutil::TempDir("modelhub-it-");
     HubOptions opt;
     opt.home = root;
     opt.catalogFiles = { fs::path(MODELHUB_SOURCE_DIR) / L"config" / L"catalog.json" };
     opt.config.port = 0;
+    opt.singleInstance = false;  // next to the user's own ModelHub
     opt.config.searchDirs = { model.parent_path() };
     opt.config.llamaServer = fs::path(MODELHUB_BINARY_DIR) / L"sdk" / L"bin" / L"llama" / L"llama-server.exe";
     Hub hub(opt);
@@ -221,12 +275,17 @@ TEST(HubIntegration, ChatThroughTheHub)
     HttpHeaders auth = { { "Authorization", "Bearer " + hub.Token() } };
     json models;
     for (int i = 0; i < 600; ++i)
-    {  // hashing a multi-GB file takes a while
+    {
+        // hashing a multi-GB file takes a while
         json s = json::parse(HttpGet(url + "/hub/v1/status", auth).body);
         if (!s["scanning"].get<bool>())
+        {
             break;
+        }
+
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
+
     models = json::parse(HttpGet(url + "/v1/models", auth).body);
     ASSERT_FALSE(models["data"].empty()) << "the file is not in the catalog or failed verification";
     std::string id = models["data"][0]["id"];

@@ -67,8 +67,13 @@ json Info7B()
 const json* File(const json& repo, const std::string& name)
 {
     for (const auto& f : repo["files"])
+    {
         if (f["file"] == name)
+        {
             return &f;
+        }
+    }
+
     return nullptr;
 }
 
@@ -249,6 +254,7 @@ TEST(HfBrowse, SearchesJudgesAddsAndDownloadsThroughTheSdk)
         json again = json::parse(sdk.Call("hf_add", json({ { "repo", repo }, { "file", "Tiny-0.5B-Instruct-Q4_K_M.gguf" } }).dump()));
         EXPECT_FALSE(again.value("added", true)) << again.dump();
     }
+
     std::error_code ec;
     fs::remove_all(root, ec);
 }

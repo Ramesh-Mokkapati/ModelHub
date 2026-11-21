@@ -53,6 +53,7 @@ TEST(Store, FindsVerifiesCachesAndRejectsFiles)
     EXPECT_FALSE(store.Find(*cat.Find("model-c")));
 
     store.AddUser(*cat.Find("model-b"), "RevEng Studio");
+
     // A second store over the same manifest: nothing is hashed again, users are kept.
     ModelStore again(hubModels, root / L"hub" / L"manifest.json", { otherApp });
     ScanResult r2 = again.Scan(cat, nullptr);

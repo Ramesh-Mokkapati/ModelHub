@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "HubServer.h"
+#include "Lessons.h"
 #include "Paths.h"
 #include "Text.h"
 #include "modelhub/modelhub_client.h"
@@ -41,27 +42,41 @@ int Usage()
         "  ModelHub pull <model>\n"
         "  ModelHub path <model>\n"
         "  ModelHub delete <model>\n"
-        "  ModelHub add-folder <dir>\n",
+        "  ModelHub add-folder <dir>\n"
+        "  ModelHub lessons-clean [--dir <folder>] [--max-lines <n>] [--keep-failed]\n",
         stderr);
+
     return 2;
 }
 
 int Serve(bool background)
 {
     if (background)
+    {
         FreeConsole();
+    }
+
     modelhub::HubOptions opt;
     opt.home = modelhub::HubHome();
     opt.config = modelhub::LoadHubConfig(modelhub::ConfigPath());
+
     // Next to the program (build output), or one folder up (the SDK and release layout: bin/catalog.json).
     opt.catalogFiles = { opt.home / L"catalog.json", modelhub::ExeDir() / L"catalog.json", modelhub::ExeDir().parent_path() / L"catalog.json" };
     modelhub::Hub hub(opt);
     std::string err;
     if (!hub.Start(&err))
     {
+        if (err.rfind(modelhub::kAlreadyRunning, 0) == 0)
+        {
+            // Only one ModelHub runs on a PC: this one leaves the running one alone.
+            std::fprintf(stderr, "%s; this one is not started.\n", err.c_str());
+            return 0;
+        }
+
         std::fprintf(stderr, "ModelHub: %s\n", err.c_str());
         return 1;
     }
+
     static modelhub::Hub* running = &hub;
     SetConsoleCtrlHandler(
         [](DWORD) -> BOOL
@@ -70,6 +85,7 @@ int Serve(bool background)
             return TRUE;
         },
         TRUE);
+
     hub.Wait();
     return 0;
 }
@@ -81,6 +97,7 @@ int Print(const mc::Response& r)
         std::fprintf(stderr, "ModelHub: %s\n", r.error.c_str());
         return 1;
     }
+
     json j = json::parse(r.body, nullptr, false);
     std::cout << (j.is_discarded() ? r.body : j.dump(2)) << "\n";
     return r.Ok() ? 0 : 1;
@@ -90,7 +107,10 @@ bool Connect(mc::Client& c, bool start)
 {
     std::string err;
     if (c.Connect(start, 30000, &err))
+    {
         return true;
+    }
+
     std::fprintf(stderr, "ModelHub: %s\n", err.c_str());
     return false;
 }
@@ -103,9 +123,15 @@ void WaitForScan(mc::Client& c)
     {
         json s = json::parse(c.Status().body, nullptr, false);
         if (!s.is_object() || !s.value("scanning", false))
+        {
             break;
+        }
+
         if (!told)
+        {
             std::fprintf(stderr, "waiting for ModelHub to check the model files (%s)...\n", s.value("scan", "").c_str());
+        }
+
         told = true;
         Sleep(500);
     }
@@ -115,12 +141,16 @@ int Pull(mc::Client& c, const std::string& model)
 {
     mc::Response r = c.StartDownload(model);
     if (!r.Ok() && r.status != 409)
+    {
         return Print(r);
+    }
+
     if (r.body.find("\"installed\"") != std::string::npos)
     {
         std::cout << model << " is already installed\n";
         return 0;
     }
+
     json started = json::parse(r.body, nullptr, false);
     std::string id = started.is_object() ? started.value("model", model) : model;
     for (;;)
@@ -128,11 +158,17 @@ int Pull(mc::Client& c, const std::string& model)
         Sleep(1000);
         json d = json::parse(c.Downloads().body, nullptr, false);
         if (!d.is_object())
+        {
             return 1;
+        }
+
         for (const auto& s : d.value("downloads", json::array()))
         {
             if (s.value("model", "") != id)
+            {
                 continue;
+            }
+
             double done = s.value("done", 0.0), total = s.value("total", 0.0), bps = s.value("bytes_per_second", 0.0);
             std::fprintf(stderr, "\r%-12s %6.1f%%  %8.1f / %.1f MB  %6.1f MB/s   ", s.value("phase", "").c_str(),
                 total > 0 ? 100.0 * done / total : 0.0, done / 1048576.0, total / 1048576.0, bps / 1048576.0);
@@ -144,6 +180,7 @@ int Pull(mc::Client& c, const std::string& model)
                     std::cout << id << " downloaded and verified\n";
                     return 0;
                 }
+
                 std::fprintf(stderr, "%s: %s\n", id.c_str(), s.value("error", "").c_str());
                 return 1;
             }
@@ -158,21 +195,69 @@ int wmain(int argc, wchar_t** argv)
     SetConsoleOutputCP(CP_UTF8);
     std::vector<std::string> a;
     for (int i = 1; i < argc; ++i)
+    {
         a.push_back(modelhub::Narrow(argv[i]));
+    }
+
     if (a.empty())
+    {
         return Usage();
+    }
+
     const std::string& cmd = a[0];
+    // the lessons in their general form, without failed attempts and long rewrites (the hub's own folder, or a
+    // repository's docs/lessons before it is committed)
+    if (cmd == "lessons-clean")
+    {
+        std::filesystem::path dir = modelhub::HubHome() / L"lessons";
+        size_t maxLines = 3;
+        bool keepFailed = false;
+        for (size_t i = 1; i < a.size(); ++i)
+        {
+            if (a[i] == "--dir" && i + 1 < a.size())
+            {
+                dir = modelhub::Utf8ToPath(a[++i]);
+            }
+            else if (a[i] == "--max-lines" && i + 1 < a.size())
+            {
+                maxLines = static_cast<size_t>(std::stoul(a[++i]));
+            }
+            else if (a[i] == "--keep-failed")
+            {
+                keepFailed = true;
+            }
+            else
+            {
+                return Usage();
+            }
+        }
+
+        json r = modelhub::LessonStore(dir).Clean("", maxLines, keepFailed);
+        for (const auto& d : r["domains"])
+        {
+            std::printf("%s: %d -> %d record(s)\n", d["domain"].get<std::string>().c_str(), d["before"].get<int>(), d["after"].get<int>());
+        }
+
+        return 0;
+    }
+
     if (cmd == "serve")
+    {
         return Serve(a.size() > 1 && a[1] == "--background");
+    }
 
     mc::Client c("ModelHub CLI");
     if (cmd == "start")
     {
         if (!Connect(c, true))
+        {
             return 1;
+        }
+
         std::cout << "ModelHub is running at http://127.0.0.1:" << c.Port() << "\n";
         return 0;
     }
+
     if (cmd == "add-folder" && a.size() == 2)
     {
         auto cfgPath = modelhub::ConfigPath();
@@ -184,21 +269,38 @@ int wmain(int argc, wchar_t** argv)
                   << "; restart the hub (ModelHub stop, ModelHub start) to use it\n";
         return 0;
     }
+
     if (!Connect(c, cmd != "stop"))
+    {
         return cmd == "stop" ? 0 : 1;
+    }
+
     if (cmd == "stop")
+    {
         return Print(c.Post("/hub/v1/shutdown", "{}"));
+    }
+
     if (cmd == "status")
+    {
         return Print(c.Status());
+    }
+
     if (cmd == "list")
     {
         WaitForScan(c);
         return Print(c.Installed());
     }
+
     if (cmd == "catalog")
+    {
         return Print(c.Catalog());
+    }
+
     if (cmd == "rescan")
+    {
         return Print(c.Rescan());
+    }
+
     if (cmd == "path" && a.size() == 2)
     {
         std::string err;
@@ -208,16 +310,22 @@ int wmain(int argc, wchar_t** argv)
             std::fprintf(stderr, "%s: %s\n", a[1].c_str(), err.c_str());
             return 1;
         }
+
         std::cout << modelhub::Narrow(p) << "\n";
         return 0;
     }
+
     if (cmd == "pull" && a.size() == 2)
+    {
         return Pull(c, a[1]);
+    }
+
     if (cmd == "delete" && a.size() == 2)
     {
         WaitForScan(c);
         return Print(c.DeleteModel(a[1]));
     }
+
     if (cmd == "advise" && a.size() >= 2)
     {
         std::string engine = "hub", current;
@@ -225,14 +333,23 @@ int wmain(int argc, wchar_t** argv)
         for (size_t i = 2; i + 1 < a.size(); i += 2)
         {
             if (a[i] == "--engine")
+            {
                 engine = a[i + 1];
+            }
             else if (a[i] == "--current")
+            {
                 current = a[i + 1];
+            }
             else if (a[i] == "--metric" && a[i + 1].find('=') != std::string::npos)
+            {
                 metrics[a[i + 1].substr(0, a[i + 1].find('='))] = std::atof(a[i + 1].substr(a[i + 1].find('=') + 1).c_str());
+            }
             else
+            {
                 return Usage();
+            }
         }
+
         WaitForScan(c);
         mc::Response r = c.Advise(a[1], engine, metrics.empty() ? "" : metrics.dump(), "", current);
         json j = json::parse(r.body, nullptr, false);
@@ -240,7 +357,10 @@ int wmain(int argc, wchar_t** argv)
         {
             std::cout << "Recommended: " << j.value("recommended", "") << "\n";
             for (const auto& n : j.value("notes", json::array()))
+            {
                 std::cout << "  " << n.get<std::string>() << "\n";
+            }
+
             std::cout << "\n  model                      fit        needs      installed\n";
             for (const auto& o : j.value("options", json::array()))
             {
@@ -250,9 +370,12 @@ int wmain(int argc, wchar_t** argv)
                     o.value("installed", false) ? "yes" : "");
                 std::cout << line;
             }
+
             return 0;
         }
+
         return Print(r);
     }
+
     return Usage();
 }

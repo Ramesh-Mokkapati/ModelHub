@@ -14,7 +14,10 @@ TEST(Catalog, ShippedCatalogParsesAndCoversBothApplications)
     EXPECT_GE(c.models.size(), 15u);
     for (const char* task : { "log-diagnosis", "code-conversion", "binary-renaming", "rename-review", "triage-planning",
              "embeddings", "port-x64", "port-unicode", "port-linux" })
+    {
         EXPECT_NE(c.FindTask(task), nullptr) << task;
+    }
+
     // RevEng's Ollama-style ids still resolve, to the same model AppAssist uses.
     const CatalogModel* m = c.Find("qwen2.5-coder:7b");
     ASSERT_NE(m, nullptr);
@@ -23,7 +26,9 @@ TEST(Catalog, ShippedCatalogParsesAndCoversBothApplications)
     EXPECT_EQ(c.Find("Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf")->id, "qwen3-coder-30b-a3b");  // by file name
     EXPECT_EQ(c.FindBySha(m->files[1].sha256), m);
     for (size_t i = 1; i < c.models.size(); ++i)
+    {
         EXPECT_LE(c.models[i - 1].SizeBytes(), c.models[i].SizeBytes());
+    }
 }
 
 TEST(Catalog, RejectsBadEntries)

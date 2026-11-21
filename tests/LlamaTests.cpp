@@ -11,6 +11,7 @@ using namespace modelhub;
 
 namespace
 {
+
 CatalogModel Model(double paramsB, double sizeGB, int layers)
 {
     CatalogModel m;
@@ -21,6 +22,7 @@ CatalogModel Model(double paramsB, double sizeGB, int layers)
     m.files.push_back({ "m.gguf", "https://x/m.gguf", static_cast<uint64_t>(sizeGB * (1ull << 30)), std::string(64, 'a') });
     return m;
 }
+
 HardwareInfo Hw(double vramGB, double ramGB)
 {
     HardwareInfo h;
@@ -31,6 +33,7 @@ HardwareInfo Hw(double vramGB, double ramGB)
     h.avx2 = true;
     return h;
 }
+
 }  // namespace
 
 TEST(Llama, GpuLayers)
@@ -49,10 +52,16 @@ TEST(Llama, ServerArgs)
     auto has = [&](const std::wstring& flag, const std::wstring& value)
     {
         for (size_t i = 0; i + 1 < a.size(); ++i)
+        {
             if (a[i] == flag && a[i + 1] == value)
+            {
                 return true;
+            }
+        }
+
         return false;
     };
+
     EXPECT_TRUE(has(L"--port", L"8090"));
     EXPECT_TRUE(has(L"--parallel", L"4"));
     EXPECT_TRUE(has(L"--ctx-size", L"65536"));  // 16K per slot x 4 slots
@@ -71,6 +80,7 @@ TEST(Llama, ChoosesTheDiscreteGpuNotTheIntegratedOne)
         "  Vulkan0: Intel(R) RaptorLake-S Mobile Graphics Controller (32610 MiB, 32610 MiB free)",
         "  Vulkan1: NVIDIA RTX 1000 Ada Generation Laptop GPU (5920 MiB, 5152 MiB free)"
     };
+
     EXPECT_EQ(ServerPool::ChooseDevice(out, "NVIDIA RTX 1000 Ada Generation Laptop GPU"), "Vulkan1");
     EXPECT_EQ(ServerPool::ChooseDevice(out, "AMD Radeon RX 7900"), "");
     EXPECT_EQ(ServerPool::ChooseDevice(out, ""), "");

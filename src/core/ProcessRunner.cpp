@@ -21,7 +21,10 @@ std::string LastErrorText(const char* what)
         code, 0, reinterpret_cast<LPWSTR>(&msg), 0, nullptr);
     std::string text = msg ? Trim(Narrow(msg)) : std::string();
     if (msg)
+    {
         LocalFree(msg);
+    }
+
     return std::string(what) + " failed (" + std::to_string(code) + "): " + text;
 }
 
@@ -33,10 +36,12 @@ struct Handle
         : h(v)
     {
     }
+
     ~Handle()
     {
         Reset();
     }
+
     Handle(const Handle&) = delete;
     Handle& operator=(const Handle&) = delete;
     Handle(Handle&& o) noexcept
@@ -44,6 +49,7 @@ struct Handle
     {
         o.h = nullptr;
     }
+
     Handle& operator=(Handle&& o) noexcept
     {
         if (this != &o)
@@ -52,14 +58,20 @@ struct Handle
             h = o.h;
             o.h = nullptr;
         }
+
         return *this;
     }
+
     void Reset()
     {
         if (h && h != INVALID_HANDLE_VALUE)
+        {
             CloseHandle(h);
+        }
+
         h = nullptr;
     }
+
     explicit operator bool() const
     {
         return h && h != INVALID_HANDLE_VALUE;
@@ -85,13 +97,21 @@ std::wstring BuildEnvironmentBlock(const std::map<std::wstring, std::wstring>& o
             std::wstring entry(p);
             size_t eq = entry.find(L'=', 1);  // entries like "=C:=C:\" start with '='
             if (eq == std::wstring::npos)
+            {
                 continue;
+            }
+
             vars[entry.substr(0, eq)] = entry.substr(eq + 1);
         }
+
         FreeEnvironmentStringsW(block);
     }
+
     for (const auto& [k, v] : overrides)
+    {
         vars[k] = v;
+    }
+
     std::wstring out;
     for (const auto& [k, v] : vars)
     {
@@ -100,6 +120,7 @@ std::wstring BuildEnvironmentBlock(const std::map<std::wstring, std::wstring>& o
         out += v;
         out.push_back(L'\0');
     }
+
     out.push_back(L'\0');
     return out;
 }
@@ -110,7 +131,10 @@ bool Launch(const ProcessSpec& spec, Launched& L, std::string* error)
     if (exe.empty())
     {
         if (error)
+        {
             *error = "executable not found: " + Narrow(spec.exe);
+        }
+
         return false;
     }
 
@@ -119,9 +143,13 @@ bool Launch(const ProcessSpec& spec, Launched& L, std::string* error)
     if (!CreatePipe(&outR, &outW, &sa, 0) || !CreatePipe(&errR, &errW, &sa, 0))
     {
         if (error)
+        {
             *error = LastErrorText("CreatePipe");
+        }
+
         return false;
     }
+
     L.outRead = Handle(outR);
     L.errRead = Handle(errR);
     Handle outWrite(outW), errWrite(errW);
@@ -134,9 +162,13 @@ bool Launch(const ProcessSpec& spec, Launched& L, std::string* error)
     if (!L.job)
     {
         if (error)
+        {
             *error = LastErrorText("CreateJobObject");
+        }
+
         return false;
     }
+
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION lim{};
     lim.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
     if (spec.memoryLimitMB)
@@ -144,6 +176,7 @@ bool Launch(const ProcessSpec& spec, Launched& L, std::string* error)
         lim.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_PROCESS_MEMORY;
         lim.ProcessMemoryLimit = static_cast<SIZE_T>(spec.memoryLimitMB) * 1024 * 1024;
     }
+
     SetInformationJobObject(L.job.h, JobObjectExtendedLimitInformation, &lim, sizeof lim);
 
     STARTUPINFOEXW si{};
@@ -176,9 +209,13 @@ bool Launch(const ProcessSpec& spec, Launched& L, std::string* error)
     if (!ok)
     {
         if (error)
+        {
             *error = LastErrorText("CreateProcess") + " for " + Narrow(cmd);
+        }
+
         return false;
     }
+
     AssignProcessToJobObject(L.job.h, pi.hProcess);
     ResumeThread(pi.hThread);
     CloseHandle(pi.hThread);
@@ -195,12 +232,19 @@ void ReadLines(HANDLE pipe, bool isErr, const LineCallback& cb, std::mutex& cbMu
     auto emit = [&](std::string_view line)
     {
         if (!line.empty() && line.back() == '\r')
+        {
             line.remove_suffix(1);
+        }
+
         if (!cb)
+        {
             return;
+        }
+
         std::lock_guard lk(cbMutex);
         cb(line, isErr);
     };
+
     while (ReadFile(pipe, buf, sizeof buf, &got, nullptr) && got > 0)
     {
         pending.append(buf, got);
@@ -210,14 +254,19 @@ void ReadLines(HANDLE pipe, bool isErr, const LineCallback& cb, std::mutex& cbMu
             emit(std::string_view(pending).substr(0, pos));
             pending.erase(0, pos + 1);
         }
+
         if (pending.size() > 1 << 20)
-        {  // pathological line without breaks
+        {
+            // pathological line without breaks
             emit(pending);
             pending.clear();
         }
     }
+
     if (!pending.empty())
+    {
         emit(pending);
+    }
 }
 
 }  // namespace
@@ -225,32 +274,48 @@ void ReadLines(HANDLE pipe, bool isErr, const LineCallback& cb, std::mutex& cbMu
 std::wstring ResolveExecutable(std::wstring_view exe)
 {
     if (exe.empty())
+    {
         return {};
+    }
+
     std::filesystem::path p(exe);
     std::error_code ec;
     if (p.has_parent_path())
     {
         if (std::filesystem::is_regular_file(p, ec))
+        {
             return p.wstring();
+        }
+
         for (const wchar_t* ext : { L".exe", L".cmd", L".bat" })
         {
             auto q = p;
             q += ext;
             if (std::filesystem::is_regular_file(q, ec))
+            {
                 return q.wstring();
+            }
         }
+
         return {};
     }
+
     std::wstring name(exe);
     for (const wchar_t* ext : { L"", L".exe", L".cmd", L".bat" })
     {
         if (*ext == 0 && name.find(L'.') == std::wstring::npos)
+        {
             continue;
+        }
+
         wchar_t buf[MAX_PATH * 2];
         DWORD n = SearchPathW(nullptr, name.c_str(), *ext ? ext : nullptr, static_cast<DWORD>(std::size(buf)), buf, nullptr);
         if (n > 0 && n < std::size(buf))
+        {
             return buf;
+        }
     }
+
     return {};
 }
 
@@ -264,10 +329,15 @@ std::wstring BuildCommandLine(const std::wstring& resolvedExe, const std::vector
         inner += L' ';
         inner += QuoteArg(a);
     }
+
     if (!script)
+    {
         return inner;
+    }
+
     wchar_t sys[MAX_PATH];
     GetSystemDirectoryW(sys, MAX_PATH);
+
     // /s strips the outer quote pair and runs the rest verbatim.
     return QuoteArg(std::wstring(sys) + L"\\cmd.exe") + L" /d /s /c \"" + inner + L"\"";
 }
@@ -278,9 +348,13 @@ bool LaunchDetached(const ProcessSpec& spec, std::string* error)
     if (exe.empty())
     {
         if (error)
+        {
             *error = "executable not found: " + Narrow(spec.exe);
+        }
+
         return false;
     }
+
     std::wstring cmd = BuildCommandLine(exe, spec.args);
     std::wstring envBlock = BuildEnvironmentBlock(spec.env);
     std::wstring cwd = spec.workDir.empty() ? std::filesystem::path(exe).parent_path().wstring() : spec.workDir.wstring();
@@ -291,9 +365,13 @@ bool LaunchDetached(const ProcessSpec& spec, std::string* error)
             cwd.c_str(), &si, &pi))
     {
         if (error)
+        {
             *error = LastErrorText("CreateProcess") + " for " + Narrow(cmd);
+        }
+
         return false;
     }
+
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
     return true;
@@ -308,6 +386,7 @@ ProcessResult RunProcess(const ProcessSpec& spec, const LineCallback& onLine, st
         r.launchFailed = true;
         return r;
     }
+
     std::mutex cbMutex;
     std::thread tOut(ReadLines, L.outRead.h, false, std::cref(onLine), std::ref(cbMutex));
     std::thread tErr(ReadLines, L.errRead.h, true, std::cref(onLine), std::ref(cbMutex));
@@ -317,13 +396,17 @@ ProcessResult RunProcess(const ProcessSpec& spec, const LineCallback& onLine, st
     {
         DWORD w = WaitForSingleObject(L.process.h, 200);
         if (w == WAIT_OBJECT_0)
+        {
             break;
+        }
+
         if (stop.stop_requested())
         {
             r.cancelled = true;
             TerminateJobObject(L.job.h, 1);
             break;
         }
+
         if (spec.timeout.count() > 0 && std::chrono::steady_clock::now() - start > spec.timeout)
         {
             r.timedOut = true;
@@ -331,7 +414,9 @@ ProcessResult RunProcess(const ProcessSpec& spec, const LineCallback& onLine, st
             break;
         }
     }
+
     WaitForSingleObject(L.process.h, 5000);
+
     // Grandchildren may still hold the pipe open; killing the job closes them.
     TerminateJobObject(L.job.h, 1);
     tOut.join();
@@ -365,7 +450,10 @@ bool ManagedProcess::Start(const ProcessSpec& spec, LineCallback onLine, std::st
     impl_ = std::make_unique<Impl>();
     impl_->cb = std::move(onLine);
     if (!Launch(spec, impl_->L, error))
+    {
         return false;
+    }
+
     impl_->tOut = std::thread(ReadLines, impl_->L.outRead.h, false, std::cref(impl_->cb), std::ref(impl_->cbMutex));
     impl_->tErr = std::thread(ReadLines, impl_->L.errRead.h, true, std::cref(impl_->cb), std::ref(impl_->cbMutex));
     return true;
@@ -384,13 +472,25 @@ uint32_t ManagedProcess::Pid() const
 void ManagedProcess::Terminate()
 {
     if (!impl_)
+    {
         return;
+    }
+
     if (impl_->L.job)
+    {
         TerminateJobObject(impl_->L.job.h, 1);
+    }
+
     if (impl_->tOut.joinable())
+    {
         impl_->tOut.join();
+    }
+
     if (impl_->tErr.joinable())
+    {
         impl_->tErr.join();
+    }
+
     impl_->L = Launched{};
 }
 

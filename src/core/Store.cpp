@@ -33,7 +33,9 @@ ModelStore::ManifestLock::ManifestLock(const fs::path& manifest)
     std::wstring name = L"Local\\ModelHub-manifest-" + Widen(Sha256(ToLower(PathToUtf8(manifest))).substr(0, 16));
     mutex_ = CreateMutexW(nullptr, FALSE, name.c_str());
     if (mutex_)
+    {
         WaitForSingleObject(mutex_, 30000);  // WAIT_ABANDONED also gives ownership
+    }
 }
 
 ModelStore::ManifestLock::~ManifestLock()
@@ -58,7 +60,10 @@ bool ModelStore::AddSearchDir(const fs::path& dir)
     if (SamePath(dir, modelsDir_) ||
         std::any_of(searchDirs_.begin(), searchDirs_.end(), [&](const fs::path& d)
             { return SamePath(d, dir); }))
+    {
         return false;
+    }
+
     searchDirs_.push_back(dir);
     return true;
 }
@@ -68,9 +73,14 @@ std::vector<fs::path> ModelStore::SearchDirs() const
     std::lock_guard lk(mu_);
     std::vector<fs::path> dirs = { modelsDir_ };
     for (const auto& d : searchDirs_)
+    {
         if (std::none_of(dirs.begin(), dirs.end(), [&](const fs::path& x)
                 { return SamePath(x, d); }))
+        {
             dirs.push_back(d);
+        }
+    }
+
     return dirs;
 }
 
@@ -86,7 +96,10 @@ std::vector<ModelStore::Entry> ModelStore::ReadManifest() const
     std::vector<Entry> out;
     std::error_code ec;
     if (!fs::exists(manifest_, ec))
+    {
         return out;
+    }
+
     json j;
     try
     {
@@ -96,8 +109,12 @@ std::vector<ModelStore::Entry> ModelStore::ReadManifest() const
     {
         return out;
     }
+
     if (!j.is_object())
+    {
         return out;
+    }
+
     for (const auto& f : j.value("files", json::array()))
     {
         Entry e;
@@ -110,8 +127,11 @@ std::vector<ModelStore::Entry> ModelStore::ReadManifest() const
         e.file = f.value("file", "");
         e.users = f.value("users", std::vector<std::string>{});
         if (!e.path.empty())
+        {
             out.push_back(std::move(e));
+        }
     }
+
     return out;
 }
 
@@ -119,6 +139,7 @@ void ModelStore::WriteManifest(const std::vector<Entry>& entries) const
 {
     json files = json::array();
     for (const auto& e : entries)
+    {
         files.push_back({ { "path", PathToUtf8(e.path) },
             { "size", e.size },
             { "mtime", e.mtime },
@@ -127,11 +148,14 @@ void ModelStore::WriteManifest(const std::vector<Entry>& entries) const
             { "model", e.modelId },
             { "file", e.file },
             { "users", e.users } });
+    }
+
     json j = { { "format", "modelhub-manifest" },
         { "version", 1 },
         { "comment", "Model files ModelHub knows about, shared by every application that uses ModelHub. "
                      "Use entries with verified=true." },
         { "files", files } };
+
     std::error_code ec;
     fs::create_directories(manifest_.parent_path(), ec);
     fs::path tmp = manifest_;
@@ -144,7 +168,10 @@ void ModelStore::RefreshIfChanged() const
 {
     int64_t t = MTime(manifest_);
     if (t == loadedMTime_)
+    {
         return;
+    }
+
     entries_ = ReadManifest();
     loadedMTime_ = t;
 }
@@ -159,18 +186,31 @@ ScanResult ModelStore::Scan(const Catalog& catalog, const ProgressFn& progress, 
     for (const fs::path& dir : dirs)
     {
         if (!fs::is_directory(dir, ec))
+        {
             continue;
+        }
+
         for (const auto& m : catalog.models)
+        {
             for (const auto& f : m.files)
             {
                 if (stop.stop_requested())
+                {
                     return r;
+                }
+
                 fs::path p = dir / Widen(f.file);
                 if (!fs::is_regular_file(p, ec) || fs::file_size(p, ec) != f.size)
+                {
                     continue;
+                }
+
                 if (std::any_of(next.begin(), next.end(), [&](const Entry& e)
                         { return SamePath(e.path, p); }))
+                {
                     continue;
+                }
+
                 Entry e;
                 e.path = p;
                 e.size = f.size;
@@ -187,7 +227,10 @@ ScanResult ModelStore::Scan(const Catalog& catalog, const ProgressFn& progress, 
                 else
                 {
                     if (progress)
+                    {
                         progress("verifying " + PathToUtf8(p) + " (" + std::to_string(f.size >> 20) + " MB)");
+                    }
+
                     try
                     {
                         e.sha256 = Sha256File(p);
@@ -195,23 +238,36 @@ ScanResult ModelStore::Scan(const Catalog& catalog, const ProgressFn& progress, 
                     catch (const std::exception& ex)
                     {
                         if (progress)
+                        {
                             progress("cannot read " + PathToUtf8(p) + ": " + ex.what());
+                        }
+
                         continue;
                     }
+
                     ++r.verified;
                     for (const auto& o : old)  // keep who used it, even if it moved
+                    {
                         if (o.sha256 == e.sha256 && e.users.empty())
+                        {
                             e.users = o.users;
+                        }
+                    }
                 }
+
                 e.verified = e.sha256 == f.sha256;
                 if (!e.verified)
                 {
                     ++r.rejected;
                     if (progress && cached == old.end())
+                    {
                         progress("rejected " + PathToUtf8(p) + ": SHA-256 does not match the catalog");
+                    }
                 }
+
                 next.push_back(std::move(e));
             }
+        }
     }
 
     // Merge with what other processes recorded meanwhile: their entries in folders this scan did not cover
@@ -223,13 +279,22 @@ ScanResult ModelStore::Scan(const Catalog& catalog, const ProgressFn& progress, 
         bool scannedHere = std::any_of(dirs.begin(), dirs.end(), [&](const fs::path& d)
             { return Under(e.path, d); });
         if (!scannedHere && fs::is_regular_file(e.path, ec) && fs::file_size(e.path, ec) == e.size)
+        {
             merged.push_back(std::move(e));
+        }
     }
+
     for (auto& e : next)
+    {
         merged.push_back(std::move(e));
+    }
+
     WriteManifest(merged);
     for (const auto& e : merged)
+    {
         r.found += e.verified;
+    }
+
     std::lock_guard lk(mu_);
     entries_ = std::move(merged);
     loadedMTime_ = MTime(manifest_);
@@ -255,9 +320,16 @@ std::optional<InstalledFile> ModelStore::Find(const CatalogModel& m) const
     RefreshIfChanged();
     std::error_code ec;
     for (const auto& f : m.files)  // primary file first, then alternates
+    {
         for (const auto& e : entries_)
+        {
             if (e.verified && e.sha256 == f.sha256 && fs::is_regular_file(e.path, ec))
+            {
                 return ToInstalled(e);
+            }
+        }
+    }
+
     return std::nullopt;
 }
 
@@ -268,8 +340,13 @@ std::vector<InstalledFile> ModelStore::List() const
     std::vector<InstalledFile> v;
     std::error_code ec;
     for (const auto& e : entries_)
+    {
         if (e.verified && fs::is_regular_file(e.path, ec))
+        {
             v.push_back(ToInstalled(e));
+        }
+    }
+
     return v;
 }
 
@@ -277,21 +354,32 @@ std::vector<InstalledFile> ModelStore::FindAll(const CatalogModel& m) const
 {
     std::set<std::string> shas;
     for (const auto& f : m.files)
+    {
         shas.insert(f.sha256);
+    }
+
     std::lock_guard lk(mu_);
     RefreshIfChanged();
     std::vector<InstalledFile> v;
     std::error_code ec;
     for (const auto& e : entries_)
+    {
         if (e.verified && shas.count(e.sha256) && fs::is_regular_file(e.path, ec))
+        {
             v.push_back(ToInstalled(e));
+        }
+    }
+
     return v;
 }
 
 void ModelStore::Remove(const std::vector<fs::path>& paths)
 {
     if (paths.empty())
+    {
         return;
+    }
+
     ManifestLock lock(manifest_);
     std::vector<Entry> entries = ReadManifest();
     entries.erase(std::remove_if(entries.begin(), entries.end(),
@@ -332,7 +420,10 @@ void ModelStore::AddDownloaded(const CatalogModel& m, const CatalogFile& f, cons
 void ModelStore::AddUser(const CatalogModel& m, const std::string& app)
 {
     if (app.empty())
+    {
         return;
+    }
+
     std::set<std::string> shas;
     for (const auto& f : m.files)
         shas.insert(f.sha256);
@@ -341,13 +432,21 @@ void ModelStore::AddUser(const CatalogModel& m, const std::string& app)
         RefreshIfChanged();
         if (std::none_of(entries_.begin(), entries_.end(), [&](const Entry& e)
                 { return e.verified && shas.count(e.sha256) && std::find(e.users.begin(), e.users.end(), app) == e.users.end(); }))
+        {
             return;
+        }
     }
+
     ManifestLock lock(manifest_);
     std::vector<Entry> entries = ReadManifest();
     for (auto& e : entries)
+    {
         if (e.verified && shas.count(e.sha256) && std::find(e.users.begin(), e.users.end(), app) == e.users.end())
+        {
             e.users.push_back(app);
+        }
+    }
+
     WriteManifest(entries);
     std::lock_guard lk(mu_);
     entries_ = std::move(entries);

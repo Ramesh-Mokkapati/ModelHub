@@ -19,11 +19,15 @@ struct HInternet
         : h(v)
     {
     }
+
     ~HInternet()
     {
         if (h)
+        {
             WinHttpCloseHandle(h);
+        }
     }
+
     HInternet(const HInternet&) = delete;
     HInternet& operator=(const HInternet&) = delete;
 };
@@ -50,16 +54,25 @@ void ReadHeaders(HINTERNET req, HttpResponse& r)
     WinHttpQueryHeaders(req, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, nullptr, &rawLen,
         WINHTTP_NO_HEADER_INDEX);
     if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || !rawLen)
+    {
         return;
+    }
+
     std::wstring raw(rawLen / sizeof(wchar_t), L'\0');
     if (!WinHttpQueryHeaders(req, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, raw.data(), &rawLen,
             WINHTTP_NO_HEADER_INDEX))
+    {
         return;
+    }
+
     for (const auto& line : SplitLines(Narrow(raw)))
     {
         auto colon = line.find(':');
         if (colon == std::string::npos)
+        {
             continue;
+        }
+
         r.headers[ToLower(Trim(line.substr(0, colon)))] = Trim(line.substr(colon + 1));
     }
 }
@@ -86,18 +99,21 @@ HttpResponse HttpRequestStream(const std::string& method, const std::string& url
         r.error = "invalid URL: " + url;
         return r;
     }
+
     HINTERNET session = SharedSession();
     if (!session)
     {
         r.error = WinHttpError("WinHttpOpen");
         return r;
     }
+
     HInternet conn(WinHttpConnect(session, host, uc.nPort, 0));
     if (!conn.h)
     {
         r.error = WinHttpError("WinHttpConnect");
         return r;
     }
+
     std::wstring target = std::wstring(path) + extra;
     DWORD flags = uc.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0;
     HINTERNET req = WinHttpOpenRequest(conn.h, Widen(method).c_str(), target.c_str(), nullptr, WINHTTP_NO_REFERER,
@@ -107,13 +123,17 @@ HttpResponse HttpRequestStream(const std::string& method, const std::string& url
         r.error = WinHttpError("WinHttpOpenRequest");
         return r;
     }
+
     // Closing the request handle is WinHTTP's documented way to abort a blocked synchronous call.
     std::atomic<HINTERNET> live{ req };
     auto closeOnce = [&live]
     {
         if (HINTERNET h = live.exchange(nullptr))
+        {
             WinHttpCloseHandle(h);
+        }
     };
+
     std::stop_callback onStop(stop, closeOnce);
     struct Closer
     {
@@ -127,7 +147,10 @@ HttpResponse HttpRequestStream(const std::string& method, const std::string& url
     WinHttpSetTimeouts(req, timeoutMs, timeoutMs, timeoutMs, timeoutMs);
     std::wstring hdrs;
     for (const auto& [k, v] : headers)
+    {
         hdrs += Widen(k) + L": " + Widen(v) + L"\r\n";
+    }
+
     if (!WinHttpSendRequest(req, hdrs.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : hdrs.c_str(),
             hdrs.empty() ? 0 : static_cast<DWORD>(-1L),
             body.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(body.data()),
@@ -138,6 +161,7 @@ HttpResponse HttpRequestStream(const std::string& method, const std::string& url
         r.error = r.cancelled ? "cancelled" : WinHttpError("HTTP " + method + " " + url);
         return r;
     }
+
     ReadHeaders(req, r);
     if (onHeaders && !onHeaders(r))
     {
@@ -155,6 +179,7 @@ HttpResponse HttpRequestStream(const std::string& method, const std::string& url
             r.error = "cancelled";
             break;
         }
+
         DWORD avail = 0;
         if (!WinHttpQueryDataAvailable(req, &avail))
         {
@@ -162,8 +187,12 @@ HttpResponse HttpRequestStream(const std::string& method, const std::string& url
             r.error = r.cancelled ? "cancelled" : WinHttpError("WinHttpQueryDataAvailable");
             break;
         }
+
         if (avail == 0)
+        {
             break;
+        }
+
         buf.resize(avail);
         DWORD read = 0;
         if (!WinHttpReadData(req, buf.data(), avail, &read))
@@ -172,6 +201,7 @@ HttpResponse HttpRequestStream(const std::string& method, const std::string& url
             r.error = r.cancelled ? "cancelled" : WinHttpError("WinHttpReadData");
             break;
         }
+
         if (read && onChunk && !onChunk(std::string_view(buf.data(), read)))
         {
             r.cancelled = true;
@@ -179,6 +209,7 @@ HttpResponse HttpRequestStream(const std::string& method, const std::string& url
             break;
         }
     }
+
     return r;
 }
 
@@ -204,24 +235,38 @@ std::vector<std::string> ParseSseEvents(const std::string& body)
         if (line.empty())
         {
             if (has)
+            {
                 events.push_back(data);
+            }
+
             data.clear();
             has = false;
             continue;
         }
+
         if (line.rfind("data:", 0) == 0)
         {
             std::string v = line.substr(5);
             if (!v.empty() && v[0] == ' ')
+            {
                 v.erase(0, 1);
+            }
+
             if (has)
+            {
                 data += "\n";
+            }
+
             data += v;
             has = true;
         }
     }
+
     if (has)
+    {
         events.push_back(data);
+    }
+
     return events;
 }
 

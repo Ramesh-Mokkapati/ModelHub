@@ -39,6 +39,7 @@ struct Work
         Repo,
         Add
     } kind;
+
     int generation = 0;  // results of an older request are dropped
     std::string repo, file;
     json result;
@@ -58,18 +59,22 @@ double Scale()
 {
     return g_hf ? GetDpiForWindow(g_hf) / 96.0 : 1.0;
 }
+
 int S(double v)
 {
     return static_cast<int>(v * Scale() + 0.5);
 }
+
 HWND Item(int id)
 {
     return GetDlgItem(g_hf, id);
 }
+
 void SetText(int id, const std::wstring& s)
 {
     SetDlgItemTextW(g_hf, id, s.c_str());
 }
+
 void Status(const std::wstring& s)
 {
     SetText(IDC_HF_STATUS, s);
@@ -78,13 +83,18 @@ void Status(const std::wstring& s)
 json Call(const std::string& method, const json& args)
 {
     if (!TheApp().core)
+    {
         return { { "error", { { "message", TheApp().coreError } } }, { "status", 500 } };
+    }
+
     return TheApp().core->Call(method, args);
 }
+
 bool IsError(const json& j)
 {
     return j.is_object() && j.contains("error");
 }
+
 std::wstring ErrorText(const json& j)
 {
     return j.is_object() && j.contains("error") && j["error"].is_object() ? Widen(j["error"].value("message", "error")) : L"error";
@@ -93,15 +103,30 @@ std::wstring ErrorText(const json& j)
 std::wstring FitText(const std::string& fit)
 {
     if (fit == "gpu")
+    {
         return L"Graphics card";
+    }
+
     if (fit == "gpu+cpu")
+    {
         return L"Graphics card + CPU";
+    }
+
     if (fit == "cpu")
+    {
         return L"CPU";
+    }
+
     if (fit == "cpu-tight")
+    {
         return L"CPU (tight on memory)";
+    }
+
     if (fit == "too-large")
+    {
         return L"Too large";
+    }
+
     return L"?";
 }
 
@@ -109,11 +134,18 @@ std::wstring Count(int64_t n)
 {
     wchar_t b[32];
     if (n >= 1000000)
+    {
         swprintf_s(b, L"%.1fM", n / 1e6);
+    }
     else if (n >= 1000)
+    {
         swprintf_s(b, L"%.1fk", n / 1e3);
+    }
     else
+    {
         swprintf_s(b, L"%lld", static_cast<long long>(n));
+    }
+
     return b;
 }
 
@@ -121,12 +153,20 @@ std::wstring Params(const json& r)
 {
     double p = r.value("params_b", 0.0), a = r.value("active_params_b", 0.0);
     if (p <= 0)
+    {
         return L"";
+    }
+
     wchar_t b[48];
     if (a > 0 && a < p * 0.8)
+    {
         swprintf_s(b, L"%.3gB (%.3gB active)", p, a);  // mixture of experts
+    }
     else
+    {
         swprintf_s(b, L"%.3gB", p);
+    }
+
     return b;
 }
 
@@ -162,8 +202,13 @@ void FillResults()
     const bool fitOnly = IsDlgButtonChecked(g_hf, IDC_HF_FITONLY) == BST_CHECKED;
     g_results.clear();
     for (const auto& r : g_allResults)
+    {
         if (!fitOnly || (!r.value("gated", false) && r.value("fit", "") != "too-large" && r.value("language_model", true)))
+        {
             g_results.push_back(r);
+        }
+    }
+
     SendMessageW(list, WM_SETREDRAW, FALSE, 0);
     ListView_DeleteAllItems(list);
     for (size_t i = 0; i < g_results.size(); ++i)
@@ -181,6 +226,7 @@ void FillResults()
         SetCell(list, at, 3, fit);
         SetCell(list, at, 4, Count(r.value("downloads", int64_t{ 0 })));
     }
+
     SendMessageW(list, WM_SETREDRAW, TRUE, 0);
     InvalidateRect(list, nullptr, TRUE);
 }
@@ -206,8 +252,13 @@ void StartSearch()
     {
         std::string t = q;
         for (const char* prefix : { "https://huggingface.co/", "http://huggingface.co/", "huggingface.co/", "hf.co/" })
+        {
             if (t.rfind(prefix, 0) == 0)
+            {
                 t.erase(0, strlen(prefix));
+            }
+        }
+
         size_t a = t.find('/');
         if (a != std::string::npos && a > 0 && t.find(' ') == std::string::npos)
         {
@@ -215,6 +266,7 @@ void StartSearch()
             direct = t.substr(0, b);
         }
     }
+
     const int gen = ++g_searchGen;
     if (!direct.empty())
     {
@@ -223,6 +275,7 @@ void StartSearch()
         ListView_SetItemState(Item(IDC_HF_RESULTS), 0, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
         return;
     }
+
     Status(L"Searching Hugging Face...");
     std::thread([q, kind, sort, gen]
         {
@@ -239,7 +292,10 @@ const json* SelectedFile()
 {
     int i = SelectedIndex(IDC_HF_FILES);
     if (i < 0 || !g_repo.is_object() || !g_repo.contains("files") || i >= static_cast<int>(g_repo["files"].size()))
+    {
         return nullptr;
+    }
+
     return &g_repo["files"][i];
 }
 
@@ -261,21 +317,36 @@ void ShowRepo()
     auto add = [&](const std::wstring& s)
     {
         if (!s.empty())
+        {
             facts += (facts.empty() ? L"" : L"  ·  ") + s;
+        }
     };
+
     add(Params(r).empty() ? L"" : Params(r) + L" parameters");
     add(Widen(r.value("architecture", "")));
     if (int c = r.value("context_k", 0); c > 0)
+    {
         add(std::to_wstring(c) + L"K context");
+    }
+
     add(r.value("license", "").empty() ? L"" : L"licence " + Widen(r.value("license", "")));
     add(Count(r.value("downloads", int64_t{ 0 })) + L" downloads");
     info += facts + L"\r\n\r\nBest for: " + Widen(r.value("best_for", ""));
     if (!r.value("description", "").empty())
+    {
         info += L"\r\n\r\n" + Widen(r.value("description", ""));
+    }
+
     if (!r.value("base_model", "").empty())
+    {
         info += L"\r\n\r\nBased on " + Widen(r.value("base_model", "")) + L".";
+    }
+
     for (const auto& n : r.value("notes", json::array()))
+    {
         info += L"\r\n\r\n⚠ " + Widen(n.get<std::string>());
+    }
+
     SetText(IDC_HF_INFO, info);
 
     HWND list = Item(IDC_HF_FILES);
@@ -288,9 +359,15 @@ void ShowRepo()
         const json& f = files[i];
         std::wstring q = Widen(f.value("quant", ""));
         if (q.empty())
+        {
             q = Widen(f.value("file", ""));
+        }
+
         if (f.value("recommended", false))
+        {
             q = L"★ " + q;
+        }
+
         LVITEMW it = { LVIF_TEXT };
         it.iItem = static_cast<int>(i);
         it.pszText = q.data();
@@ -305,13 +382,17 @@ void ShowRepo()
                                                               : L"Runs here";
         SetCell(list, at, 5, status);
         if (!g_wantFile.empty() ? f.value("file", "") == g_wantFile : f.value("recommended", false))
+        {
             select = at;
+        }
     }
+
     if (select >= 0)
     {
         ListView_SetItemState(list, select, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
         ListView_EnsureVisible(list, select, FALSE);
     }
+
     g_wantFile.clear();
     SendMessageW(list, WM_SETREDRAW, TRUE, 0);
     InvalidateRect(list, nullptr, TRUE);
@@ -342,15 +423,21 @@ void DownloadSelected()
 {
     const json* f = SelectedFile();
     if (!f || !f->value("compatible", false) || f->value("installed", false))
+    {
         return;
+    }
+
     const std::string repo = g_repo.value("repo", ""), file = f->value("file", "");
     if (f->value("fit", "") == "gpu+cpu" || f->value("fit", "") == "cpu-tight")
     {
         std::wstring q = L"This file runs " + std::wstring(f->value("fit", "") == "gpu+cpu" ? L"partly on the CPU" : L"close to this PC's memory limit") +
                          L", so it will be slow. Download it anyway?";
         if (MessageBoxW(g_hf, q.c_str(), L"Download", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+        {
             return;
+        }
     }
+
     Status(L"Adding " + Widen(file) + L" to ModelHub...");
     EnableWindow(Item(IDC_HF_DOWNLOAD), FALSE);
     std::thread([repo, file]
@@ -367,12 +454,16 @@ void OnDone(std::unique_ptr<Work> w)
     if (w->kind == Work::Search)
     {
         if (w->generation != g_searchGen)
+        {
             return;
+        }
+
         if (IsError(w->result))
         {
             Status(ErrorText(w->result));
             return;
         }
+
         g_allResults = w->result.value("results", json::array());
         FillResults();
         Status(std::to_wstring(g_results.size()) + L" models. Select one to see what it is best for and which of its files run on this PC.");
@@ -380,17 +471,23 @@ void OnDone(std::unique_ptr<Work> w)
     else if (w->kind == Work::Repo)
     {
         if (w->generation != g_repoGen)
+        {
             return;
+        }
+
         if (IsError(w->result))
         {
             SetText(IDC_HF_INFO, Widen(w->repo) + L"\r\n\r\n" + ErrorText(w->result));
             Status(ErrorText(w->result));
             return;
         }
+
         g_repo = w->result;
         ShowRepo();
+
         // A repository opened by name has no search details yet: take them from the repository.
         for (size_t i = 0; i < g_results.size(); ++i)
+        {
             if (g_results[i].value("repo", "") == w->repo && g_results[i].value("category", "").empty())
             {
                 g_results[i] = g_repo;
@@ -400,6 +497,7 @@ void OnDone(std::unique_ptr<Work> w)
                 SetCell(list, static_cast<int>(i), 3, g_repo.value("gated", false) ? L"Gated" : FitText(g_repo.value("fit", "")));
                 SetCell(list, static_cast<int>(i), 4, Count(g_repo.value("downloads", int64_t{ 0 })));
             }
+        }
     }
     else
     {
@@ -410,6 +508,7 @@ void OnDone(std::unique_ptr<Work> w)
             MessageBoxW(g_hf, ErrorText(w->result).c_str(), L"Download", MB_ICONERROR);
             return;
         }
+
         const std::string id = w->result.contains("model") ? w->result["model"].value("id", "") : "";
         Status(L"Downloading " + Widen(w->file) + L" as " + Widen(id) +
                L". The ModelHub window shows the progress; the model is shared with every application.");
@@ -426,6 +525,7 @@ void Layout()
     {
         SetWindowPos(Item(id), nullptr, x, y, std::max(0, w), std::max(0, h), SWP_NOZORDER | SWP_NOACTIVATE);
     };
+
     int y = m;
     const int kindW = S(150), sortW = S(140), searchW = S(84), labelW = S(48);
     int x = W - m - searchW;
@@ -466,10 +566,17 @@ INT_PTR CALLBACK Proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         LoadIconMetric(TheApp().inst, MAKEINTRESOURCEW(IDI_APP), LIM_SMALL, &little);
         SendMessageW(dlg, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(big));
         SendMessageW(dlg, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(little));
+
         for (const auto& k : kKinds)
+        {
             SendDlgItemMessageW(dlg, IDC_HF_KIND, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Widen(k[1]).c_str()));
+        }
+
         for (const auto& s : kSorts)
+        {
             SendDlgItemMessageW(dlg, IDC_HF_SORT, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Widen(s[1]).c_str()));
+        }
+
         SendDlgItemMessageW(dlg, IDC_HF_KIND, CB_SETCURSEL, 0, 0);
         SendDlgItemMessageW(dlg, IDC_HF_SORT, CB_SETCURSEL, 0, 0);
         SendDlgItemMessageW(dlg, IDC_HF_QUERY, EM_SETCUEBANNER, TRUE,
@@ -511,7 +618,9 @@ INT_PTR CALLBACK Proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
             auto* nm = reinterpret_cast<NMLISTVIEW*>(lp);
             if ((nm->uNewState & LVIS_SELECTED) && !(nm->uOldState & LVIS_SELECTED) && nm->iItem >= 0 &&
                 nm->iItem < static_cast<int>(g_results.size()))
+            {
                 LoadRepo(g_results[nm->iItem].value("repo", ""));
+            }
         }
         else if (h->idFrom == IDC_HF_FILES && h->code == LVN_ITEMCHANGED)
         {
@@ -535,7 +644,9 @@ INT_PTR CALLBACK Proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
         case IDC_HF_KIND:
         case IDC_HF_SORT:
             if (HIWORD(wp) == CBN_SELCHANGE)
+            {
                 StartSearch();
+            }
             break;
         case IDC_HF_FITONLY:
             FillResults();
@@ -545,7 +656,9 @@ INT_PTR CALLBACK Proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
             break;
         case IDC_HF_OPEN:
             if (g_repo.is_object() && g_repo.contains("url"))
+            {
                 ShellExecuteW(dlg, L"open", Widen(g_repo.value("url", "")).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            }
             break;
         case IDCANCEL:
             DestroyWindow(dlg);
@@ -570,11 +683,20 @@ INT_PTR CALLBACK Proc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
 void ShowHfBrowser(HWND owner)
 {
     if (!g_hf)
+    {
         CreateDialogParamW(TheApp().inst, MAKEINTRESOURCEW(IDD_HF_BROWSER), owner, Proc, 0);
+    }
+
     if (!g_hf)
+    {
         return;
+    }
+
     if (IsIconic(g_hf))
+    {
         ShowWindow(g_hf, SW_RESTORE);
+    }
+
     ShowWindow(g_hf, SW_SHOW);
     SetForegroundWindow(g_hf);
 }

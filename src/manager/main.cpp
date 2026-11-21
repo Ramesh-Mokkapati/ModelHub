@@ -57,14 +57,17 @@ ServiceInfo Probe()
         s.state = ServiceState::Stopped;
         return s;
     }
+
     s.state = ServiceState::Running;
     s.port = c.Port();
+
     json j = json::parse(c.Status().body, nullptr, false);
     if (j.is_object())
     {
         s.version = j.value("version", "");
         s.servers = static_cast<int>(j.value("servers", json::array()).size());
     }
+
     return s;
 }
 
@@ -72,7 +75,9 @@ void PostService(const ServiceInfo& s)
 {
     auto* p = new ServiceInfo(s);
     if (!PostMessageW(g_app.tray, WM_APP_SERVICE, 0, reinterpret_cast<LPARAM>(p)))
+    {
         delete p;  // exiting
+    }
 }
 
 bool WaitFor(bool running, DWORD ms)
@@ -81,7 +86,10 @@ bool WaitFor(bool running, DWORD ms)
     for (DWORD waited = 0; waited < ms; waited += 250)
     {
         if (c.Connect(false, 0) == running)
+        {
             return true;
+        }
+
         Sleep(250);
     }
     return false;
@@ -92,16 +100,23 @@ bool StartService(std::wstring* error)
 {
     mc::Client c(kAppName);
     if (c.Connect(false, 0))
+    {
         return true;
+    }
+
     fs::path exe = modelhub::ExeDir() / L"ModelHub.exe";
     if (!fs::exists(exe))
     {
         std::string err;
         if (c.Connect(true, 30000, &err))
+        {
             return true;
+        }
+
         *error = modelhub::Widen(err);
         return false;
     }
+
     std::wstring cmd = L"\"" + exe.wstring() + L"\" serve --background";
     STARTUPINFOW si = { sizeof si };
     PROCESS_INFORMATION pi = {};
@@ -111,6 +126,7 @@ bool StartService(std::wstring* error)
         *error = L"Cannot start " + exe.wstring() + L" (error " + std::to_wstring(GetLastError()) + L").";
         return false;
     }
+
     CloseHandle(pi.hThread);
     DWORD exitCode = STILL_ACTIVE;
     for (DWORD waited = 0; waited < 30000; waited += 250)
@@ -120,18 +136,25 @@ bool StartService(std::wstring* error)
             CloseHandle(pi.hProcess);
             return true;
         }
+
         if (WaitForSingleObject(pi.hProcess, 250) == WAIT_OBJECT_0)
         {
             GetExitCodeProcess(pi.hProcess, &exitCode);
             break;
         }
     }
+#
     CloseHandle(pi.hProcess);
     if (exitCode != STILL_ACTIVE)
+    {
         *error = L"ModelHub.exe stopped at once (exit code " + std::to_wstring(exitCode) +
                  L"). Another program may be using its port; see config.json in " + modelhub::HubHome().wstring() + L".";
+    }
     else
+    {
         *error = L"ModelHub.exe did not answer within 30 seconds.";
+    }
+
     return false;
 }
 
@@ -139,15 +162,22 @@ bool StopService(std::wstring* error)
 {
     mc::Client c(kAppName);
     if (!c.Connect(false, 0))
+    {
         return true;
+    }
+
     mc::Response r = c.Shutdown();
     if (!r.Ok() && r.status != 0)
     {
         *error = L"ModelHub did not accept the request to stop (HTTP " + std::to_wstring(r.status) + L").";
         return false;
     }
+
     if (WaitFor(false, 20000))
+    {
         return true;
+    }
+
     *error = L"ModelHub did not stop within 20 seconds.";
     return false;
 }
@@ -157,9 +187,14 @@ void Poll(std::stop_token stop)
     while (!stop.stop_requested())
     {
         if (!g_busy)
+        {
             PostService(Probe());
+        }
+
         for (int i = 0; i < 20 && !stop.stop_requested(); ++i)
+        {
             Sleep(100);
+        }
     }
 }
 
@@ -181,7 +216,10 @@ bool AutostartOn()
     wchar_t buf[MAX_PATH * 3];
     DWORD size = sizeof buf;
     if (RegGetValueW(HKEY_CURRENT_USER, kRunKey, kRunValue, RRF_RT_REG_SZ, nullptr, buf, &size) != ERROR_SUCCESS)
+    {
         return false;
+    }
+
     return _wcsicmp(buf, AutostartCommand().c_str()) == 0;
 }
 
@@ -257,7 +295,10 @@ void Exit()
                                   L"stopped the next time you download them.\n\nExit anyway?")
                 .c_str(),
             L"ModelHub Manager", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+    {
         return;
+    }
+
     CloseManager();
     DestroyWindow(g_app.tray);
 }
@@ -265,10 +306,12 @@ void Exit()
 LRESULT CALLBACK TrayProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     if (msg == g_taskbarCreated && g_taskbarCreated)
-    {  // Explorer restarted
+    {
+        // Explorer restarted
         AddTrayIcon();
         return 0;
     }
+
     switch (msg)
     {
     case WM_APP_TRAY:
@@ -291,7 +334,10 @@ LRESULT CALLBACK TrayProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     {
         std::unique_ptr<ServiceInfo> s(reinterpret_cast<ServiceInfo*>(lp));
         if (!g_busy || s->state == ServiceState::Starting)
+        {
             g_app.service = *s;  // polls wait while busy
+        }
+
         UpdateTray();
         ManagerServiceChanged();
         return 0;
@@ -300,7 +346,10 @@ LRESULT CALLBACK TrayProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     {
         std::unique_ptr<ActionResult> r(reinterpret_cast<ActionResult*>(lp));
         if (!r->ok)
+        {
             Notify(L"ModelHub service", r->message, true);
+        }
+
         UpdateTray();
         ManagerServiceChanged();
         return 0;
@@ -323,16 +372,21 @@ LRESULT CALLBACK TrayProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
             Exit();
             break;
         }
+
         return 0;
     case WM_ENDSESSION:
         if (wp)
+        {
             RemoveTrayIcon();
+        }
+
         return 0;
     case WM_DESTROY:
         RemoveTrayIcon();
         PostQuitMessage(0);
         return 0;
     }
+
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
@@ -370,9 +424,15 @@ std::wstring ServiceText(const ServiceInfo& s)
     {
         std::wstring t = L"running on port " + std::to_wstring(s.port);
         if (!s.version.empty())
+        {
             t += L" (version " + modelhub::Widen(s.version) + L")";
+        }
+
         if (s.servers > 0)
+        {
             t += L", " + std::to_wstring(s.servers) + (s.servers == 1 ? L" model loaded" : L" models loaded");
+        }
+
         return t;
     }
     default:
@@ -392,10 +452,16 @@ void ServiceAction(int command)
                     (command == ID_TRAY_STOP ? L"Stop the service anyway?" : L"Restart the service anyway?"))
                     .c_str(),
                 L"ModelHub service", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+        {
             return;
+        }
     }
+
     if (g_busy.exchange(true))
+    {
         return;
+    }
+
     g_app.service.state = command == ID_TRAY_START ? ServiceState::Starting : ServiceState::Stopping;
     UpdateTray();
     ManagerServiceChanged();
@@ -403,9 +469,21 @@ void ServiceAction(int command)
         {
         auto* r = new ActionResult;
         std::wstring err;
-        if (command == ID_TRAY_STOP || command == ID_TRAY_RESTART) r->ok = StopService(&err);
-        if (r->ok && command == ID_TRAY_RESTART) PostService({ServiceState::Starting});
-        if (r->ok && (command == ID_TRAY_START || command == ID_TRAY_RESTART)) r->ok = StartService(&err);
+        if (command == ID_TRAY_STOP || command == ID_TRAY_RESTART)
+        {
+            r->ok = StopService(&err);
+        }
+
+        if (r->ok && command == ID_TRAY_RESTART)
+        {
+            PostService({ ServiceState::Starting });
+        }
+        
+        if (r->ok && (command == ID_TRAY_START || command == ID_TRAY_RESTART))
+        {
+            r->ok = StartService(&err);
+        }
+
         r->message = err;
         ServiceInfo now = Probe();
         g_busy = false;
@@ -417,7 +495,10 @@ void ServiceAction(int command)
 void UpdateTray()
 {
     if (!g_app.tray)
+    {
         return;
+    }
+
     const ServiceState st = g_app.service.state;
     const bool busy = g_busy || st == ServiceState::Starting || st == ServiceState::Stopping || !g_app.downloadSummary.empty();
     NOTIFYICONDATAW nid = { sizeof nid };
@@ -428,7 +509,10 @@ void UpdateTray()
                                                                 : g_icons[1];
     std::wstring tip = L"ModelHub service: " + ServiceText(g_app.service);
     if (!g_app.downloadSummary.empty())
+    {
         tip += L"\n" + g_app.downloadSummary;
+    }
+
     wcsncpy_s(nid.szTip, tip.c_str(), _TRUNCATE);
     Shell_NotifyIconW(NIM_MODIFY, &nid);
 }
@@ -455,9 +539,13 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int)
     for (int i = 1; i < __argc; ++i)
     {
         if (_wcsicmp(__wargv[i], L"--tray") == 0)
+        {
             trayOnly = true;
+        }
         else if (_wcsicmp(__wargv[i], L"--start-service") == 0)
+        {
             startService = true;
+        }
     }
 
     HANDLE single = CreateMutexW(nullptr, TRUE, L"Local\\ModelHubManager");
@@ -466,10 +554,16 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int)
         if (HWND other = FindWindowW(kTrayClass, nullptr))
         {
             if (!trayOnly)
+            {
                 PostMessageW(other, WM_APP_SHOW, 0, 0);
+            }
+
             if (startService)
+            {
                 PostMessageW(other, WM_COMMAND, ID_TRAY_START, 0);
+            }
         }
+
         return 0;
     }
 
@@ -480,7 +574,9 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int)
     g_app.inst = inst;
     const int iconIds[3] = { IDI_TRAY_RUNNING, IDI_TRAY_STOPPED, IDI_TRAY_BUSY };
     for (int i = 0; i < 3; ++i)
+    {
         LoadIconMetric(inst, MAKEINTRESOURCEW(iconIds[i]), LIM_SMALL, &g_icons[i]);
+    }
 
     WNDCLASSEXW wc = { sizeof wc };
     wc.lpfnWndProc = TrayProc;
@@ -495,31 +591,46 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int)
     modelhub::CoreOptions opt;
     opt.home = modelhub::HubHome();
     opt.config = modelhub::LoadHubConfig(modelhub::ConfigPath());
+
     // Next to the program (build output), or one folder up (the SDK and release layout: bin/catalog.json).
     opt.catalogFiles = { opt.home / L"catalog.json", modelhub::ExeDir() / L"catalog.json", modelhub::ExeDir().parent_path() / L"catalog.json" };
     opt.app = kAppName;
     g_app.core = std::make_unique<modelhub::HubCore>(opt);
     if (!g_app.core->Init(&g_app.coreError))
+    {
         g_app.core.reset();
+    }
 
     AddTrayIcon();
     g_poll = std::jthread(Poll);
     if (startService)
+    {
         ServiceAction(ID_TRAY_START);
+    }
+
     if (!trayOnly)
+    {
         ShowManager();
+    }
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0)
     {
         if (ManagerDialogMessage(&msg))
+        {
             continue;
+        }
+
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
+
     g_poll = {};
     for (int i = 0; i < 300 && g_app.workers > 0; ++i)
+    {
         Sleep(100);  // Hugging Face lookups end within their timeouts
+    }
+
     g_app.core.reset();  // stops downloads (they resume later)
     CoUninitialize();
     ReleaseMutex(single);

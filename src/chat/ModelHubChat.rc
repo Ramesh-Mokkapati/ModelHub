@@ -1,0 +1,256 @@
+#include <winver.h>
+#include <winresrc.h>
+#include <commctrl.h>
+#include <richedit.h>
+
+#include "resource.h"
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+IDI_APP ICON "res/modelhub.ico"
+
+// Positions are placeholders: ChatDlg.cpp lays the window out (it is resizable).
+IDD_MAIN DIALOGEX 0, 0, 700, 450
+STYLE DS_SHELLFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CLIPCHILDREN
+EXSTYLE WS_EX_APPWINDOW | WS_EX_ACCEPTFILES
+CAPTION "ModelHub Chat"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "ModelHub Chat", IDC_TITLE, 0, 0, 10, 10
+    PUSHBUTTON      "New chat", IDC_NEW_CHAT, 0, 0, 10, 10
+    EDITTEXT        IDC_SEARCH, 0, 0, 10, 10, ES_AUTOHSCROLL
+    PUSHBUTTON      "MCP Servers", IDC_MCP_SERVERS, 0, 0, 10, 10
+    PUSHBUTTON      "Model Providers", IDC_PROVIDERS, 0, 0, 10, 10
+    PUSHBUTTON      "Settings", IDC_SETTINGS, 0, 0, 10, 10
+    LTEXT           "Recent conversations", IDC_RECENT_LABEL, 0, 0, 10, 10
+    CONTROL         "", IDC_CONVERSATIONS, "SysTreeView32", TVS_HASBUTTONS | TVS_SHOWSELALWAYS | TVS_FULLROWSELECT | TVS_TRACKSELECT | TVS_NOHSCROLL | TVS_INFOTIP | WS_TABSTOP, 0, 0, 10, 10
+    LTEXT           "", IDC_WORKSPACE, 0, 0, 10, 10, SS_PATHELLIPSIS | SS_NOTIFY
+    PUSHBUTTON      "Change folder...", IDC_WORKSPACE_CHANGE, 0, 0, 10, 10
+    CONTROL         "", IDC_TRANSCRIPT, "RICHEDIT50W", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | ES_NOHIDESEL | WS_VSCROLL | WS_TABSTOP, 0, 0, 10, 10
+    CTEXT           "Hello there", IDC_HELLO, 0, 0, 10, 10
+    CTEXT           "Type a message or upload files to get started", IDC_HELLO_SUB, 0, 0, 10, 10
+    LTEXT           "", IDC_ATTACHMENTS, 0, 0, 10, 10, SS_ENDELLIPSIS
+    PUSHBUTTON      "Clear", IDC_CLEAR_ATTACHMENTS, 0, 0, 10, 10
+    EDITTEXT        IDC_INPUT, 0, 0, 10, 10, ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL
+    PUSHBUTTON      "+", IDC_PLUS, 0, 0, 10, 10
+    COMBOBOX        IDC_MODEL, 0, 0, 10, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "R", IDC_REFRESH_MODELS, 0, 0, 10, 10
+    DEFPUSHBUTTON   "Send", IDC_SEND, 0, 0, 10, 10
+    LTEXT           "", IDC_STATUS, 0, 0, 10, 10, SS_ENDELLIPSIS
+END
+
+IDD_SYSTEM_MESSAGE DIALOGEX 0, 0, 340, 200
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "System Message"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "Instructions the model gets before the conversation (this chat):", -1, 7, 7, 326, 10
+    EDITTEXT        IDC_SYSTEM_TEXT, 7, 20, 326, 136, ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL
+    CONTROL         "Also use it for new chats", IDC_SYSTEM_DEFAULT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 162, 200, 10
+    DEFPUSHBUTTON   "OK", IDOK, 229, 179, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 283, 179, 50, 14
+END
+
+IDD_TOOLS DIALOGEX 0, 0, 240, 250
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Tools"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "Tools the model may call:", -1, 7, 7, 226, 10
+    CONTROL         "", IDC_TOOLS_TREE, "SysTreeView32", TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | TVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 20, 226, 186
+    PUSHBUTTON      "All", IDC_TOOLS_ALL, 7, 211, 40, 14
+    PUSHBUTTON      "None", IDC_TOOLS_NONE, 51, 211, 40, 14
+    DEFPUSHBUTTON   "OK", IDOK, 129, 229, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 183, 229, 50, 14
+END
+
+IDD_MCP_SERVERS DIALOGEX 0, 0, 420, 220
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "MCP Servers"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "Model Context Protocol servers give the model more tools and resources. Local servers run as a command (stdio); remote ones are reached by URL (streamable HTTP).", -1, 7, 7, 406, 20
+    CONTROL         "", IDC_MCP_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 30, 350, 160
+    PUSHBUTTON      "&Add...", IDC_MCP_ADD, 363, 30, 50, 14
+    PUSHBUTTON      "&Edit...", IDC_MCP_EDIT, 363, 48, 50, 14
+    PUSHBUTTON      "&Remove", IDC_MCP_REMOVE, 363, 66, 50, 14
+    PUSHBUTTON      "Re&connect", IDC_MCP_RECONNECT, 363, 92, 50, 14
+    DEFPUSHBUTTON   "OK", IDOK, 309, 199, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 363, 199, 50, 14
+END
+
+IDD_MCP_EDIT DIALOGEX 0, 0, 320, 150
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "MCP Server"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Name:", -1, 7, 9, 60, 10
+    EDITTEXT        IDC_MCP_NAME, 70, 7, 243, 13, ES_AUTOHSCROLL
+    LTEXT           "&Transport:", -1, 7, 27, 60, 10
+    COMBOBOX        IDC_MCP_TRANSPORT, 70, 25, 243, 60, CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&Command:", IDC_MCP_COMMAND_LABEL, 7, 45, 60, 10
+    EDITTEXT        IDC_MCP_COMMAND, 70, 43, 243, 13, ES_AUTOHSCROLL
+    LTEXT           "e.g. npx -y @modelcontextprotocol/server-memory", -1, 70, 58, 243, 10
+    LTEXT           "&URL:", IDC_MCP_URL_LABEL, 7, 75, 60, 10
+    EDITTEXT        IDC_MCP_URL, 70, 73, 243, 13, ES_AUTOHSCROLL
+    LTEXT           "&Bearer token:", IDC_MCP_TOKEN_LABEL, 7, 93, 60, 10
+    EDITTEXT        IDC_MCP_TOKEN, 70, 91, 243, 13, ES_AUTOHSCROLL | ES_PASSWORD
+    CONTROL         "&Enabled", IDC_MCP_ENABLED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 70, 110, 100, 10
+    DEFPUSHBUTTON   "OK", IDOK, 209, 129, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 263, 129, 50, 14
+END
+
+IDD_SETTINGS DIALOGEX 0, 0, 340, 262
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Settings"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Local models", -1, 7, 7, 326, 86
+    CONTROL         "&ModelHub service (starts it when needed; models from ModelHub Manager)", IDC_BACKEND_HUB, "Button", BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP, 14, 20, 312, 10
+    CONTROL         "&Other OpenAI-compatible server, e.g. llama-server:", IDC_BACKEND_CUSTOM, "Button", BS_AUTORADIOBUTTON, 14, 33, 312, 10
+    LTEXT           "URL:", -1, 26, 49, 40, 10
+    EDITTEXT        IDC_CUSTOM_URL, 70, 47, 256, 13, ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "API key:", -1, 26, 66, 40, 10
+    EDITTEXT        IDC_CUSTOM_KEY, 70, 64, 256, 13, ES_AUTOHSCROLL | ES_PASSWORD
+    CONTROL         "Start ModelHub when &needed", IDC_AUTO_START_HUB, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 79, 200, 10
+    PUSHBUTTON      "Open ModelHub Mana&ger", IDC_OPEN_MANAGER, 226, 78, 100, 12
+    GROUPBOX        "Tools", -1, 7, 98, 326, 100
+    LTEXT           "Default &workspace folder:", -1, 14, 112, 100, 10
+    EDITTEXT        IDC_DEFAULT_WORKSPACE, 14, 123, 256, 13, ES_AUTOHSCROLL
+    PUSHBUTTON      "&Browse...", IDC_BROWSE_WORKSPACE, 276, 123, 50, 13
+    LTEXT           "&Shell for exec_shell_command:", -1, 14, 142, 110, 10
+    COMBOBOX        IDC_SHELL, 130, 140, 100, 60, CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "Ask before running shell &commands", IDC_CONFIRM_SHELL, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 158, 200, 10
+    CONTROL         "Ask before writing or editing &files", IDC_CONFIRM_WRITES, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 14, 171, 200, 10
+    LTEXT           "Most tool rounds per message:", -1, 14, 184, 110, 10
+    EDITTEXT        IDC_MAX_ROUNDS, 130, 182, 40, 13, ES_NUMBER
+    GROUPBOX        "Generation", -1, 7, 203, 326, 34
+    LTEXT           "&Temperature (empty: model default):", -1, 14, 218, 130, 10
+    EDITTEXT        IDC_TEMPERATURE, 150, 216, 40, 13, ES_AUTOHSCROLL
+    CONTROL         "Show &reasoning", IDC_SHOW_REASONING, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 210, 218, 110, 10
+    PUSHBUTTON      "Open &data folder", IDC_DATA_FOLDER, 7, 243, 80, 14
+    DEFPUSHBUTTON   "OK", IDOK, 229, 243, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 283, 243, 50, 14
+END
+
+IDD_AUTO DIALOGEX 0, 0, 340, 230
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Auto mode"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "With the model set to Auto, each message goes to the installed model that suits it best on this PC (ModelHub loads it when needed). Pick a model for a kind of request to always use it.", -1, 7, 7, 326, 26
+    GROUPBOX        "Models", -1, 7, 30, 326, 120
+    LTEXT           "Quick questions:", -1, 14, 42, 90, 10
+    COMBOBOX        IDC_AUTO_CAT_FIRST + 0, 110, 40, 210, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "General:", -1, 14, 60, 90, 10
+    COMBOBOX        IDC_AUTO_CAT_FIRST + 1, 110, 58, 210, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Code:", -1, 14, 78, 90, 10
+    COMBOBOX        IDC_AUTO_CAT_FIRST + 2, 110, 76, 210, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Reasoning:", -1, 14, 96, 90, 10
+    COMBOBOX        IDC_AUTO_CAT_FIRST + 3, 110, 94, 210, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Agent (tools):", -1, 14, 114, 90, 10
+    COMBOBOX        IDC_AUTO_CAT_FIRST + 4, 110, 112, 210, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Images:", -1, 14, 132, 90, 10
+    COMBOBOX        IDC_AUTO_CAT_FIRST + 5, 110, 130, 210, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Let a small installed model &classify each request too (slower, sees nuance)", IDC_AUTO_ROUTER, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 156, 326, 10
+    CONTROL         "&Keep the conversation's model when it is nearly as good (no reloading)", IDC_AUTO_STICKY, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 170, 326, 10
+    CONTROL         "&Suggest better models that are not downloaded yet", IDC_AUTO_SUGGEST, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 184, 326, 10
+    DEFPUSHBUTTON   "OK", IDOK, 229, 209, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 283, 209, 50, 14
+END
+
+IDD_PROVIDERS DIALOGEX 0, 0, 440, 236
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Model Providers"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "Models from other places, next to ModelHub's: ChatGPT (your ChatGPT sign-in, through Codex), cloud APIs (Claude, OpenAI, Gemini, ...), GitHub Copilot (your Copilot subscription) and programs on this PC that serve models (Ollama, LM Studio, Jan).", -1, 7, 7, 426, 20
+    CONTROL         "", IDC_PROV_LIST, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 30, 370, 150
+    PUSHBUTTON      "&Add...", IDC_PROV_ADD, 383, 30, 50, 14
+    PUSHBUTTON      "&Edit...", IDC_PROV_EDIT, 383, 48, 50, 14
+    PUSHBUTTON      "&Remove", IDC_PROV_REMOVE, 383, 66, 50, 14
+    PUSHBUTTON      "&Detect", IDC_PROV_DETECT, 383, 92, 50, 14
+    LTEXT           "Detect looks for API keys in environment variables, the ChatGPT sign-in of the Codex app or CLI, Anthropic's CLI, the accounts of GitHub tools (GitHub Copilot, the GitHub CLI, Git), and model servers on this PC (Ollama, LM Studio, Jan).", IDC_PROV_NOTE, 7, 184, 426, 26
+    CONTROL         "&Import from installed applications when ModelHub Chat starts", IDC_PROV_AUTOIMPORT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 217, 310, 10
+    DEFPUSHBUTTON   "OK", IDOK, 329, 215, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 383, 215, 50, 14
+END
+
+IDD_PROVIDER_EDIT DIALOGEX 0, 0, 340, 238
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Model Provider"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Start from:", -1, 7, 9, 64, 10
+    COMBOBOX        IDC_PE_PRESET, 74, 7, 259, 200, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "&Name:", -1, 7, 27, 64, 10
+    EDITTEXT        IDC_PE_NAME, 74, 25, 259, 13, ES_AUTOHSCROLL
+    LTEXT           "&API:", -1, 7, 45, 64, 10
+    COMBOBOX        IDC_PE_KIND, 74, 43, 259, 60, CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "&URL:", -1, 7, 63, 64, 10
+    EDITTEXT        IDC_PE_URL, 74, 61, 259, 13, ES_AUTOHSCROLL
+    LTEXT           "API &key:", -1, 7, 81, 64, 10
+    EDITTEXT        IDC_PE_KEY, 74, 79, 199, 13, ES_AUTOHSCROLL | ES_PASSWORD
+    PUSHBUTTON      "Get a key", IDC_PE_KEYPAGE, 278, 79, 55, 13
+    LTEXT           "Or the &variable:", -1, 7, 99, 64, 10
+    EDITTEXT        IDC_PE_KEYENV, 74, 97, 120, 13, ES_AUTOHSCROLL
+    LTEXT           "variable, or ""gh"" / ""gh:host"" for the GitHub CLI's sign-in (GHE)", -1, 198, 96, 135, 18
+    CONTROL         "&Enabled", IDC_PE_ENABLED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 74, 116, 100, 10
+    CONTROL         "Auto mode may &use its models", IDC_PE_AUTO, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 74, 129, 200, 10
+    LTEXT           "", IDC_PE_PRIVACY, 7, 144, 326, 28
+    PUSHBUTTON      "&Test", IDC_PE_TEST, 7, 176, 50, 14
+    PUSHBUTTON      "Sign &in...", IDC_PE_SIGNIN, 7, 194, 50, 14
+    LTEXT           "", IDC_PE_RESULT, 62, 178, 271, 24
+    DEFPUSHBUTTON   "OK", IDOK, 229, 217, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 283, 217, 50, 14
+END
+
+IDD_CLAUDE DIALOGEX 0, 0, 330, 160
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Claude models"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "", IDC_CL_INTRO, 7, 7, 316, 44
+    LTEXT           "", IDC_CL_STATE, 7, 56, 316, 44
+    PUSHBUTTON      "&Install Anthropic CLI", IDC_CL_INSTALL, 7, 106, 90, 14
+    PUSHBUTTON      "&Sign in...", IDC_CL_SIGNIN, 102, 106, 60, 14
+    PUSHBUTTON      "Use an API &key instead...", IDC_CL_KEYPAGE, 167, 106, 100, 14
+    DEFPUSHBUTTON   "Close", IDOK, 273, 139, 50, 14
+END
+
+IDD_RENAME DIALOGEX 0, 0, 260, 60
+STYLE DS_SHELLFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Rename conversation"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDC_RENAME_TEXT, 7, 9, 246, 13, ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK", IDOK, 149, 39, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 203, 39, 50, 14
+END
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION MODELHUB_VER_MAJOR, MODELHUB_VER_MINOR, MODELHUB_VER_PATCH, MODELHUB_VER_BUILD
+ PRODUCTVERSION MODELHUB_VER_MAJOR, MODELHUB_VER_MINOR, MODELHUB_VER_PATCH, MODELHUB_VER_BUILD
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "FileDescription", "ModelHub Chat - chat with local models"
+            VALUE "FileVersion", MODELHUB_VERSION
+            VALUE "InternalName", "ModelHubChat"
+            VALUE "OriginalFilename", "ModelHubChat.exe"
+            VALUE "ProductName", "ModelHub"
+            VALUE "ProductVersion", MODELHUB_VERSION
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

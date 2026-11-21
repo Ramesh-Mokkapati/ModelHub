@@ -40,11 +40,15 @@ struct SdkFixture : ::testing::Test
         fs::create_directories(home);
         WriteTextFile(appFolder / L"shared.gguf", shared.content);  // an application already has this one
         for (size_t i = 0; i < remote.content.size(); i += 5)
+        {
             remote.content[i] = static_cast<char>('a' + i % 26);
+        }
+
         mirror.files["remote.gguf"] = remote.content;
         std::string tasks = R"([{"id":"chat","name":"Chat","start_small":false,"tiers":[{"prefer":["remote-model","shared-model"]}]}])";
         WriteTextFile(home / L"catalog.json",
             testutil::CatalogJson({ shared, remote }, tasks, "http://127.0.0.1:" + std::to_string(mirror.port) + "/"));
+
         // No default search folders: only what the test adds.
         WriteTextFile(home / L"config.json", R"({"search_dirs": []})");
         options = json({ { "app", "SdkTest" },
@@ -52,11 +56,13 @@ struct SdkFixture : ::testing::Test
                            { "llama_server", PathToUtf8(fs::path(MODELHUB_BINARY_DIR) / L"sdk" / L"bin" / L"llama" / L"llama-server.exe") } })
                       .dump();
     }
+
     void TearDown() override
     {
         std::error_code ec;
         fs::remove_all(root, ec);
     }
+
     static json Call(Sdk& sdk, const std::string& method, const json& args = json::object())
     {
         return json::parse(sdk.Call(method, args.dump()));
@@ -182,6 +188,7 @@ TEST_F(SdkFixture, CustomModelsAreDownloadableAndPersist)
         EXPECT_TRUE(d.value("installed", false)) << d.dump();
         EXPECT_EQ(Call(sdk, "resolve_hf", { { "spec", "not a spec" } })["status"], 400);
     }
+
     Sdk reopened;  // custom_models.json is read again
     ASSERT_TRUE(reopened.Open(options));
     Call(reopened, "wait_scan");
@@ -191,7 +198,10 @@ TEST_F(SdkFixture, CustomModelsAreDownloadableAndPersist)
 TEST_F(SdkFixture, ServerStartReportsWhyAModelCannotRun)
 {
     if (!fs::exists(fs::path(MODELHUB_BINARY_DIR) / L"sdk" / L"bin" / L"llama" / L"llama-server.exe"))
+    {
         GTEST_SKIP();
+    }
+
     Sdk sdk;
     ASSERT_TRUE(sdk.Open(options));
     Call(sdk, "add_folder", { { "path", PathToUtf8(appFolder) }, { "persist", false } });

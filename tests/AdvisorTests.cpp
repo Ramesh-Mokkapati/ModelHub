@@ -76,12 +76,18 @@ TEST(Advisor, RenamingPicksTheLargestModelOnTheGpu)
         ASSERT_NE(a.recommended, nullptr) << vram;
         const CatalogModel* expected = nullptr;
         for (const auto& id : t.tiers[0].prefer)
+        {
             if (!expected && FitFor(*c.Find(id), hw, t.contextTokens, t.parallel, Engine::Hub) == Fit::Gpu)
+            {
                 expected = c.Find(id);
+            }
+        }
+
         ASSERT_NE(expected, nullptr) << vram;
         EXPECT_EQ(a.recommended->id, expected->id) << vram << " GB";
         EXPECT_EQ(GpuLayersFor(*a.recommended, hw, t.contextTokens, t.parallel), 999);
     }
+
     // The same task on a CPU-only engine ignores the GPU.
     Advice cpu = Advise(c, t, Pc(32, 24), Engine::EmbeddedCpu, nullptr, "", 0, None);
     EXPECT_EQ(FitFor(*cpu.recommended, Pc(32, 24), t.contextTokens, t.parallel, Engine::EmbeddedCpu), Fit::Cpu);
@@ -103,6 +109,7 @@ TEST(Advisor, PartialOffloadAndDiskAndInstalledState)
     w.summary = "1000 lines";
     auto installed7b = [](const CatalogModel& m)
     { return m.id == "qwen2.5-coder-7b"; };
+
     Advice a = Advise(c, t, Pc(32, 0), Engine::EmbeddedCpu, &w, "", 0, installed7b);
     EXPECT_EQ(a.recommended->id, "qwen2.5-coder-7b");
     EXPECT_TRUE(a.recommendedInstalled);
@@ -110,7 +117,9 @@ TEST(Advisor, PartialOffloadAndDiskAndInstalledState)
     // Too little disk for anything but what is installed.
     Advice disk = Advise(c, *c.FindTask("log-diagnosis"), Pc(64, 0), Engine::EmbeddedCpu, &w, "", 2ull << 30, installed7b);
     for (const auto& o : disk.options)
+    {
         EXPECT_EQ(o.fitsDisk, o.installed || o.model->SizeBytes() + (1ull << 30) <= (2ull << 30));
+    }
 }
 
 TEST(Advisor, NothingFits)

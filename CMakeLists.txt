@@ -58,6 +58,7 @@ add_library(ModelHubCore STATIC
   src/core/Downloader.cpp
   src/core/ServerPool.cpp
   src/core/Lessons.cpp
+  src/core/LessonGeneral.cpp
   src/core/HubCore.cpp
 )
 target_include_directories(ModelHubCore PUBLIC src/core)
@@ -94,6 +95,44 @@ add_executable(ModelHubManager WIN32
 )
 target_include_directories(ModelHubManager PRIVATE src/manager include)
 target_link_libraries(ModelHubManager PRIVATE ModelHubCore comctl32 shell32 ole32 winhttp)
+
+# ---------------------------------------------------------------- ModelHubChat.exe (MFC chat client)
+# Chats with local models through the service's OpenAI-compatible /v1 (or any llama-server): streaming answers,
+# reasoning, attachments, a system message, built-in tools (files, search, shell) and MCP servers (stdio, HTTP).
+option(MODELHUB_BUILD_CHAT "Build ModelHubChat.exe (needs the Visual Studio MFC component)" ON)
+if(MODELHUB_BUILD_CHAT)
+  set(CMAKE_MFC_FLAG 2)  # MFC in a shared DLL
+  add_executable(ModelHubChat WIN32
+    src/chat/AnthropicClient.cpp
+    src/chat/ChatApp.cpp
+    src/chat/ChatDlg.cpp
+    src/chat/ClaudeSetup.cpp
+    src/chat/Clipboard.cpp
+    src/chat/Codex.cpp
+    src/chat/Copilot.cpp
+    src/chat/Dialogs.cpp
+    src/chat/Http.cpp
+    src/chat/LlmClient.cpp
+    src/chat/Mcp.cpp
+    src/chat/OllamaMigrate.cpp
+    src/chat/Panels.cpp
+    src/chat/ProviderDialogs.cpp
+    src/chat/Providers.cpp
+    src/chat/Router.cpp
+    src/chat/Store.cpp
+    src/chat/Tools.cpp
+    src/chat/Util.cpp
+    src/chat/ModelHubChat.rc
+  )
+  unset(CMAKE_MFC_FLAG)
+  target_compile_definitions(ModelHubChat PRIVATE _AFXDLL)
+  target_link_options(ModelHubChat PRIVATE /ENTRY:wWinMainCRTStartup)  # Unicode MFC: AfxWinMain via wWinMain
+  target_include_directories(ModelHubChat PRIVATE src/chat src/manager include)  # src/manager: res/modelhub.ico
+  target_link_libraries(ModelHubChat PRIVATE nlohmann_json::nlohmann_json winhttp crypt32 shell32 windowscodecs comctl32 bcrypt)
+  add_custom_command(TARGET ModelHubChat POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${MODELHUB_SDK_DIR}/bin/$<CONFIG>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:ModelHubChat> ${MODELHUB_SDK_DIR}/bin/$<CONFIG>)
+endif()
 
 # ---------------------------------------------------------------- SDK staging: build/sdk
 # include/  headers;  lib/<Config>/ModelHubSdk.lib;  bin/<Config>/ModelHubSdk.dll, ModelHub.exe, ModelHubManager.exe;
@@ -135,8 +174,14 @@ add_executable(ModelHubTests
   tests/LlamaTests.cpp
   tests/HfBrowseTests.cpp
   tests/LessonTests.cpp
+  tests/MsvcStlCompat.cpp
 )
 target_link_libraries(ModelHubTests PRIVATE ModelHubService ModelHubCxx14Check ModelHubSdk GTest::gtest GTest::gtest_main)
+if(MSVC)
+  target_link_libraries(ModelHubTests PRIVATE
+    $<$<CONFIG:Debug>:msvcprtd>
+    $<$<NOT:$<CONFIG:Debug>>:msvcprt>)
+endif()
 target_compile_definitions(ModelHubTests PRIVATE MODELHUB_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
                                                  MODELHUB_BINARY_DIR="${CMAKE_BINARY_DIR}")
 include(GoogleTest)
@@ -146,6 +191,10 @@ gtest_discover_tests(ModelHubTests DISCOVERY_MODE PRE_TEST)
 
 # ---------------------------------------------------------------- install + package (the SDK layout)
 install(TARGETS ModelHub ModelHubManager ModelHubSdk RUNTIME DESTINATION bin/$<CONFIG> ARCHIVE DESTINATION lib/$<CONFIG>)
+if(MODELHUB_BUILD_CHAT)
+  install(TARGETS ModelHubChat RUNTIME DESTINATION bin/$<CONFIG>)
+  set(CMAKE_INSTALL_MFC_LIBRARIES ON)  # mfc140u.dll for ModelHubChat.exe
+endif()
 install(FILES config/catalog.json DESTINATION bin)
 install(FILES README.md LICENSE THIRD_PARTY_NOTICES.md DESTINATION .)
 install(FILES ${MODELHUB_SDK_DIR}/ModelHubConfig.cmake ${MODELHUB_SDK_DIR}/ModelHubConfigVersion.cmake

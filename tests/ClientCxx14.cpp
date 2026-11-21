@@ -18,7 +18,10 @@ std::wstring PathViaClient(const std::wstring& home, const std::string& model, s
 {
     modelhub::client::Client c("cxx14-test", home);
     if (!c.Connect(false, 0, error))
+    {
         return std::wstring();
+    }
+
     return c.ModelPath(model, error, 5000);
 }
 
@@ -26,7 +29,10 @@ std::string AdviseViaClient(const std::wstring& home, const std::string& task, c
 {
     modelhub::client::Client c("cxx14-test", home);
     if (!c.Connect(false))
+    {
         return std::string();
+    }
+
     return c.Advise(task, "hub", metrics, "test workload").body;
 }
 
@@ -36,7 +42,10 @@ std::string SdkCallViaCxx14(const std::string& options, const std::string& metho
 {
     modelhub::Sdk sdk;
     if (!sdk.Open(options, modelhub::Sdk::LogFn(), error))
+    {
         return std::string();
+    }
+
     return sdk.Call(method, args);
 }
 

@@ -13,6 +13,9 @@ endif()
 set(modelhub_solution_projects
   ModelHub ModelHubManager ModelHubSdk ModelHubService ModelHubCore ModelHubTests ModelHubClientCxx14 ModelHubCxx14Check
   ALL_BUILD ZERO_CHECK)
+if(TARGET ModelHubChat)
+  list(INSERT modelhub_solution_projects 2 ModelHubChat)
+endif()
 file(RELATIVE_PATH modelhub_build_rel "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}")
 
 # Both formats, whichever generator configured the build: the classic .sln (VS 2022 and later) and the .slnx (VS 2026).

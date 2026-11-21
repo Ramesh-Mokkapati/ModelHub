@@ -36,12 +36,18 @@
 namespace modelhub
 {
 
+// Hub::Start's error starts with this when another ModelHub runs already (not a failure for "serve").
+constexpr const char* kAlreadyRunning = "ModelHub is already running";
+
 struct HubOptions
 {
     std::filesystem::path home;                       // models\, manifest.json, hub.json
     std::vector<std::filesystem::path> catalogFiles;  // first that parses wins
     HubConfig config;
     bool writeHubInfo = true;                         // hub.json for clients (tests may turn it off)
+    // One ModelHub service per machine, whatever its version or home folder: a second one does not start.
+    // Tests that run their own hubs next to the user's turn it off (each home still runs once).
+    bool singleInstance = true;
 };
 
 class Hub

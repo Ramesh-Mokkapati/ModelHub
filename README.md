@@ -11,9 +11,24 @@ Everything local-LLM applications on a Windows PC share about models and llama.c
   file on one PC.
 - **Lessons.** What applications learn while fixing things is shared: records per key (`lessons_add`,
   `lessons_query`, `lessons_stats`) in `%LOCALAPPDATA%\ModelHub\lessons\<domain>.jsonl`, and a playbook per
-  domain (`playbook`, `playbook_add`) in `<domain>.md`. Files in `docs/lessons` are copied there when missing,
-  so a new install starts with what earlier projects taught (`reveng-fix.jsonl`: 119 fixes for MSVC and javac
-  errors; `reveng-stitch-lessons.md`: how to reproduce and fix stitched projects).
+  domain (`playbook`, `playbook_add`) in `<domain>.md`. The lessons in `docs/lessons` are brought in at start:
+  a new install starts with what earlier projects taught, and an existing one gets the records and playbook
+  sections it lacks (nothing it already has is changed). Shipped: `reveng-fix.jsonl` (58 fixes for MSVC and
+  javac errors), `reveng-stitch-lessons.md` (how to reproduce and fix stitched projects), `port-fix.jsonl` and
+  `port-fix.md` (PortAssistAI: 4 fixes for MBCS -> Unicode and x64 ports, and the compiler documentation notes) and
+  `refactor-fix.jsonl` (Refactor Studio: 54 fixes), all in the general form below.
+  `python scripts/export_lessons.py [domain ...]` (default `port-fix refactor-fix`, `--dry-run` to look first)
+  adds what this PC's hub learned to `docs/lessons`, with a program's own file names and paths hidden
+  (`'app.h'` -> `'<file1>.h'`, `C:\src\...` -> `<path>`) and every masked name listed for review.
+  Every lesson is kept in a **general form**, whichever application adds it: what the fix did, not whose code it was in. The
+  program's own names that the fix keeps on both sides become `name1`, `name2`, ... and a text it keeps unchanged `"text1"`, ...
+  (the same placeholder in the lines before, the lines after and the message); comments go and each side starts at column 0.
+  What the fix is about stays: a name on one side only (`CharUpperBuffA` -> `CharUpperBuff`, `DWORD` -> `DWORD_PTR`), the
+  Windows API, the C and C++ libraries, MFC and ATL, keywords, `ALL_CAPS` macros and types, and format strings
+  (`"%d"` -> `"%zu"`): `CharUpperBuffA(joined, 5)` is stored as `CharUpperBuffA(name1, 5)`. An application that replays
+  lessons treats the placeholders as wildcards. `ModelHub lessons-clean [--dir <folder>] [--max-lines 3] [--keep-failed]`
+  rewrites a lessons folder in this form (the hub's own, or `docs/lessons` before a commit), without failed attempts and
+  without fixes longer than 3 lines on either side, each lesson once.
 - **llama.cpp.** The pinned, verified `llama-server` build, and servers started on demand (GPU layers chosen
   from the free graphics memory).
 
@@ -85,6 +100,14 @@ without it.
   without the DLL.
 - **Starting it.** Applications start it when they need it (`modelhub_client.h`'s `Connect`). You can start,
   stop and restart it yourself from `ModelHubManager.exe`'s tray icon, or with `ModelHub start` / `ModelHub stop`.
+- **One at a time.** Only one ModelHub service runs on a PC, whatever its version or home folder.
+  - The service holds the machine-wide mutex `Global\ModelHub.Service`. A second `ModelHub serve` sees it, says
+    "ModelHub is already running", and exits with code 0.
+  - Versions from before this check don't hold the mutex, so a ModelHub that already answers `/health` for its
+    home's `hub.json`, or on the standard port 39281, counts as running too.
+  - The service binds its port exclusively (`SO_EXCLUSIVEADDRUSE`), so no other server can share it.
+  - A ModelHub that did not start leaves the running one's `hub.json` alone. Earlier versions deleted it on the way
+    out, which hid the running service from every client.
 
 ## ModelHub Manager
 
@@ -149,6 +172,351 @@ the service: green while it runs, grey when stopped, amber while it starts, stop
 RevEng Studio and AppAssist use the DLL and have no model code of their own any more (see
 *Applications using ModelHub* below).
 
+## ModelHub Chat
+
+`ModelHubChat.exe` (MFC, next to `ModelHub.exe`) is a chat window for the local models, in the style of
+llama.cpp's web UI:
+
+- **Sidebar.** *New chat* (Ctrl+N), *Search* (titles and messages), *MCP Servers*, *Model Providers*, *Settings*, and the recent
+  conversations grouped by workspace folder. Right-click a conversation to rename it, export it as Markdown, open
+  its folder or delete it. The sidebar is laid out like Claude's desktop app, with icons, collapsible folder
+  groups, and your name at the bottom. Collapse it with the button at its top right.
+- **Environment and Context panel (right).** It shows:
+  - *Environment*: this computer, the workspace folder (click to open it, or *Change*), the Git branch, and the model in use.
+  - *Context*: about how much of the model's context window the conversation fills. Click to see the breakdown.
+  - *Changes*: files the tools wrote or edited. Click one to open it.
+  - Close the panel with its ×. Show it again with the button at the top right of the conversation.
+- **Resizable panels.** Drag the edge of either side panel to resize it. The widths and which panels are shown are
+  saved.
+- **Toolbar.** Buttons at the top right of the conversation:
+  - Show or hide the right panel.
+  - *Tools*.
+  - Open a terminal in the workspace folder (Windows Terminal, else PowerShell).
+  - Open the workspace folder.
+  - *More*: new chat, export, change the folder, MCP servers, providers, settings.
+- **Composer.** One row, like Claude's: "+" (attachments and options), the message, ↵ (send) and a microphone.
+  - Enter or ↵ sends, and Shift+Enter starts a new line. The box grows with the text, up to eight lines.
+  - Escape or the stop button (it replaces ↵ while an answer is written) ends an answer.
+  - The microphone starts Windows voice typing (Windows+H), which types into the message box. Below the message box are the status line and three controls:
+  - The model: ModelHub's models, plus one submenu per provider. Models that only make embeddings are not listed.
+  - The thinking effort.
+  - A dot showing whether the models could be listed. Click it to refresh.
+
+  Drop files on the window to attach them. Text files
+  and MCP resources are put inline in the message, and images are sent as `image_url` parts (for vision models).
+- **Paste.** Ctrl+V (or Shift+Insert, the right-click *Paste*, or *Paste image, files or text* in the "+" menu)
+  attaches what is on the clipboard:
+  - An image, such as a screenshot or a picture copied from a browser, becomes `pasted-image-N.png`.
+  - Files copied in Explorer are attached as if dropped.
+  - Text longer than 4,000 characters or 60 lines becomes `pasted-text-N.txt`.
+  - Shorter text pastes into the message as usual. When the clipboard holds both text and a picture of it, as
+    Word and Excel put there, the text wins.
+- **The "+" menu.**
+  - *Reasoning*: Default, Off (`enable_thinking: false`), Low, Medium or High (`reasoning_effort`).
+  - *Add files*.
+  - *System Message*: for this chat, or for every new chat.
+  - *Tools*: a check box for each tool, grouped as *Built-in* and one group per MCP server.
+  - *MCP Servers*: turn each server on or off.
+  - *MCP Resources*: attach a server's resource.
+  - *Auto mode...* and *Model providers...* (below).
+- **Answers** stream in, with the model's reasoning in grey and the tokens per second in the status line. Tool
+  calls run in a loop until the model answers, at most 25 rounds by default. Each answer names its model.
+- **Copy.** Every code block has a *Copy code* button above it, and every answer a *Copy answer* button below it.
+  They copy the text as written, without the Markdown fences.
+- **Built-in tools.** They work in the conversation's workspace folder (*Change folder...*):
+  - `read_file`, `file_glob_search`, `grep_search`
+  - `exec_shell_command` (cmd.exe or PowerShell, with a timeout)
+  - `write_file`, `edit_file`
+  - `get_datetime`
+
+  Shell commands, writes and edits ask first. You can turn the asking off in Settings.
+- **MCP servers.** A local command (stdio, e.g. `npx -y @modelcontextprotocol/server-memory`) or a URL
+  (streamable HTTP, with an optional bearer token). The model sees their tools as `<server>__<tool>`. A server's
+  processes run in a job object, so they end with the window.
+- **Where answers come from.** By default the ModelHub service. When it is not running, ModelHub Chat starts it as
+  it opens, and the status line says so. It looks for `ModelHub.exe` through `install.json`, `MODELHUB_EXE`,
+  `PATH`, and then next to `ModelHubChat.exe`. Settings has *Start ModelHub when needed* to turn this off. The
+  model's `llama-server` loads on the first message. Settings can point at any other OpenAI-compatible server instead,
+  such as `llama-server -m model.gguf --port 8080` (`http://127.0.0.1:8080/v1`).
+- **Auto mode** (the first entry in the model list, and the default) picks a model for each message:
+  - It sorts the request into *quick*, *general*, *code*, *reasoning*, *agent* (work on files or commands through
+    tools) or *images*. The rules look at the words (whole words only), attached files and images, the length of
+    the conversation, and whether tools are on. A short reply such as "yes, do it" keeps the conversation's kind.
+  - It then scores the models it may use by what suits that kind (coders for code, reasoning models for
+    reasoning) and by how they run on this PC: ModelHub's fit (graphics card, graphics card + CPU, CPU) and speed,
+    and whether the model is loaded already. ModelHub loads the chosen model, and frees graphics memory from idle
+    ones, on the first request.
+  - The conversation keeps its model when it is nearly as good, so it is not reloaded for every message. A long
+    conversation asks ModelHub for a server with a larger context.
+  - A line above the answer says which model was chosen and why. When a model that is not downloaded would be
+    clearly better here and fits this PC, the line suggests it with a *Download* button. ModelHub downloads it into
+    the shared store, the status line shows the progress, and Auto mode can use it once it is there.
+  - *Auto mode...* (in the "+" menu) sets a fixed model for a kind of request. It also turns on two options: a
+    small installed model can classify each request too, and download suggestions can be switched off.
+- **Model providers.** Models from ChatGPT, Claude, Gemini, GitHub Copilot, other cloud APIs and model servers on
+  this PC appear in the model picker next to ModelHub's. See [Models from other providers](#models-from-other-providers)
+  for the setup of each one.
+- **Ollama's models.** When Ollama has downloaded models (in `%OLLAMA_MODELS%` or `%USERPROFILE%\.ollama\models`),
+  ModelHub Chat offers at startup to move them into ModelHub. The same thing is in the "+" menu as *Move Ollama
+  models to ModelHub*.
+  - The question lists the models and sizes, and says whether Ollama is still installed or running.
+  - Each model's GGUF file keeps its SHA-256. It is registered with ModelHub as the catalog model it matches, or
+    as a custom model `ollama-<name>` with Ollama's registry URL, so ModelHub can download it again.
+  - The file is moved into ModelHub's models folder (a rename on the same disk), and ModelHub verifies it.
+  - When every model has moved, Ollama's models folder is deleted. If one cannot move, for example because Ollama
+    has it open, the folder is kept. A vision model's image projector is not moved, so it reads text only.
+  - *Don't ask again* stops the question; the menu entry stays.
+- **Files.** Settings and conversations are kept in `%LOCALAPPDATA%\ModelHub\chat`: `settings.json` and
+  `conversations\<id>.json`.
+
+It needs Visual Studio's *C++ MFC* component. `-DMODELHUB_BUILD_CHAT=OFF` skips it.
+
+## Models from other providers
+
+ModelHub Chat can use models from other places next to ModelHub's own. Their models appear in the model picker
+below the message box, with one submenu per provider. Two places manage them:
+
+- **Model Providers** (in the sidebar, or the "+" menu) lists the providers, with **Add...**, **Edit...**,
+  **Remove** and **Detect**.
+- **Model Provider** (from **Add...** or **Edit...**) sets up one provider:
+  - **Start from** picks a preset, which fills in the name, API and URL.
+  - **API key** takes a key, and **Get a key** opens the page that issues one. **Or the variable** names an
+    environment variable that holds the key instead.
+  - **Enabled** switches the provider on or off. **Auto mode may use its models** lets Auto mode pick them.
+  - **Test** checks the provider by asking it for its models.
+  - **Sign in...** runs the provider's own sign-in (ChatGPT, Claude, GitHub Copilot).
+
+### At a glance
+
+| Provider | What you need | How it connects | Cost |
+|---|---|---|---|
+| ChatGPT | The Codex app (or Codex CLI), signed in with your ChatGPT account | Codex CLI (`codex exec`) | Your ChatGPT plan's Codex usage |
+| OpenAI API | An API key from platform.openai.com | OpenAI API | Pay per use |
+| Claude | Anthropic's CLI signed in to your Anthropic Console account, or an API key | Anthropic Messages API | Pay per use (Console account) |
+| Gemini (and Google Antigravity's models) | A free API key from aistudio.google.com | Gemini's OpenAI-compatible API | Free tier with limits, or pay per use |
+| GitHub Copilot | A Copilot subscription and the GitHub Copilot app | Copilot runtime | Your Copilot usage |
+| Mistral, OpenRouter, Groq, DeepSeek | An API key from each | Their OpenAI-compatible APIs | Pay per use |
+| Ollama, LM Studio, Jan, llama.cpp | The program installed and running | OpenAI-compatible server on this PC | Free; nothing leaves the PC |
+
+The ChatGPT, Claude and Antigravity desktop apps' own sign-ins stay inside those apps. Other programs need an API
+key or a CLI sign-in: the Codex CLI for ChatGPT, and Anthropic's CLI for Claude.
+
+### Automatic setup
+
+When ModelHub Chat starts, it imports the providers it finds on this PC. **Detect** in *Model Providers* does the
+same at any time. It looks for:
+
+- API keys in environment variables: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` (or
+  `GOOGLE_API_KEY`), `MISTRAL_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY` and `DEEPSEEK_API_KEY`.
+- The Codex CLI's ChatGPT sign-in, which adds *ChatGPT* with the models Codex lists for your account.
+- Anthropic's CLI sign-in (`ant auth login`), which adds *Claude*.
+- GitHub Copilot, for each GitHub and GitHub Enterprise account that GitHub tools on this PC know. Those tools are
+  the GitHub Copilot app, the Copilot and GitHub CLIs, Git Credential Manager and Visual Studio. Only the names of
+  their Windows Credential Manager entries are read, never the secrets.
+- Ollama, LM Studio (with its configured port) and Jan, installed or running.
+- Google Antigravity: if there is no Gemini key, Detect explains how to add one.
+
+A provider is imported once: one you remove stays removed. A provider that is found but not signed in is added
+switched off. To stop the import at startup, clear **Import from installed applications when ModelHub Chat
+starts** in *Model Providers*.
+
+### Step by step
+
+#### ChatGPT (your ChatGPT sign-in)
+
+This uses your ChatGPT Plus, Pro, Business or Enterprise plan, with no API key.
+
+1. Install the **Codex app** from OpenAI. Or install the Codex CLI on its own: `npm install -g @openai/codex`.
+2. Sign in to Codex with your ChatGPT account: open the Codex app once, or run `codex login`.
+3. Start ModelHub Chat. *ChatGPT* is imported with your account's models. If it isn't, open **Model Providers**
+   and select **Detect**.
+4. To set it up by hand instead:
+   1. Open **Model Providers**, select **Add...**, and under **Start from** pick **ChatGPT (your ChatGPT
+      sign-in, through the Codex app or CLI)**.
+   2. Select **Sign in...** if you aren't signed in yet. It runs `codex login` in a command window and opens
+      your browser.
+   3. Select **Test**: it should list your models (for example GPT-5.6-Luna). Then select **OK**.
+5. Pick a model from the **ChatGPT** submenu of the model picker.
+
+Things to know:
+
+- Codex can read files and run read-only commands in the conversation's folder, and they appear in the
+  reasoning. It can't change anything.
+- The app's own tools and MCP servers aren't passed to Codex.
+- Answers arrive all at once, not word by word.
+- Each prompt counts toward your plan's Codex usage.
+
+#### OpenAI API (ChatGPT's models with an API key)
+
+1. Create a key at platform.openai.com/api-keys. **Get a key** in the provider window opens that page.
+2. Open **Model Providers**, select **Add...**, and under **Start from** pick **ChatGPT models (OpenAI API)**.
+3. Paste the key into **API key**. Or set the `OPENAI_API_KEY` environment variable and leave the box empty.
+4. Select **Test**, then **OK**.
+
+#### Claude
+
+Your Claude Pro or Max subscription works only in Anthropic's own apps. Here you use your Anthropic Console
+account, with a CLI sign-in or an API key.
+
+1. Open the **"+"** menu and select **Set up Claude**. When the Claude app or Claude Code is installed, ModelHub
+   Chat also offers this at startup.
+2. In the **Claude models** window:
+   1. Select **Install Anthropic CLI** if it's missing. It downloads the latest release from
+      github.com/anthropics/anthropic-cli, checks it against the release's SHA-256 checksums, and installs it into
+      `%LOCALAPPDATA%\ModelHub\tools\ant`.
+   2. Select **Sign in...**. It runs `ant auth login` for your Anthropic Console account. The window notices
+      when you're done, and the *Claude* provider is added and switched on.
+   3. Or select **Use an API key instead...**: create a key at console.anthropic.com/settings/keys and paste it
+      into the *Claude* provider's **API key**. Setting `ANTHROPIC_API_KEY` works too.
+3. Pick a model from the **Claude** submenu.
+
+#### Gemini (and Google Antigravity's models)
+
+Antigravity's Google sign-in works only inside Antigravity, because Google doesn't allow other programs to use it.
+The same Gemini models are available here with a Gemini API key.
+
+1. Go to **aistudio.google.com/apikey** and sign in with your Google account.
+2. If **Create a new key** shows "No Cloud Projects Available", create a project first:
+   1. Open the project list and choose **Create project**.
+   2. Or open **Projects** in AI Studio's sidebar and select **Create a new project**.
+   3. Any name works. The free tier needs no billing.
+3. Select **Create API key**, choose the project, select **Create key**, and copy the key.
+4. In ModelHub Chat, open **Model Providers**, select **Add...**, and under **Start from** pick **Gemini (Google
+   AI, OpenAI-compatible)**.
+5. Paste the key into **API key** and select **Test**. It should list the Gemini models. Then select **OK**.
+6. Instead of steps 4 and 5, you can set the key once in PowerShell, then restart ModelHub Chat:
+
+   ```powershell
+   [Environment]::SetEnvironmentVariable("GEMINI_API_KEY", "<your key>", "User")
+   ```
+
+7. Pick a model from the **Gemini** submenu.
+
+Things to know:
+
+- On the free tier, new models often answer "HTTP 503: … high demand". Try again later, or use an older model:
+  gemini-3.5-flash worked when gemini-3.8-flash didn't.
+- Thinking models can take a minute before they start answering. The status line counts the seconds, and Escape
+  stops the wait.
+- Gemini may call the app's tools without being asked, for example to list files in the workspace folder. The
+  tool results are sent to Google. To prevent that, switch tools off with the **Tools** button on the toolbar.
+
+#### GitHub Copilot (github.com or GitHub Enterprise)
+
+1. Install the **GitHub Copilot app** and sign in. Open it once, so that it downloads the Copilot runtime.
+2. Start ModelHub Chat. Copilot is imported for each GitHub host this PC has an account on: github.com and, for
+   example, `company.ghe.com`.
+3. A host shown switched off isn't signed in:
+   1. Open **Model Providers**, select it, and select **Edit...**.
+   2. Select **Sign in...**. It runs `copilot login` for github.com, or `copilot login --host
+      https://company.ghe.com`.
+   3. Select **Test**, then switch on **Enabled**.
+4. To add a host by hand:
+   1. Select **Add...** and pick **GitHub Copilot on GitHub Enterprise Cloud**.
+   2. Replace `<host>` in **URL** with your host.
+   3. Select **Sign in...**, then **Test**.
+5. Pick a model from the **GitHub Copilot** submenu.
+
+Each prompt counts toward the account's Copilot usage. A provider counts as signed in only when the Copilot
+runtime's account is on that provider's host.
+
+#### Mistral, OpenRouter, Groq and DeepSeek
+
+1. Create an API key on the provider's site. **Get a key** opens the right page.
+2. Select **Add...** and pick the provider under **Start from**.
+3. Paste the key, or set the provider's environment variable (`MISTRAL_API_KEY`, `OPENROUTER_API_KEY`,
+   `GROQ_API_KEY` or `DEEPSEEK_API_KEY`).
+4. Select **Test**, then **OK**.
+
+#### Ollama, LM Studio, Jan, llama.cpp and other local servers
+
+These run on this PC, so nothing leaves it.
+
+1. Install the program and start its server:
+   - **Ollama** runs in the background after installation. Its port is 11434, or the one in `OLLAMA_HOST`.
+   - **LM Studio**: start its local server. Its port is 1234, or the one in its settings.
+   - **Jan**: switch on its local API server. Its port is 1337.
+   - **llama.cpp**: run `llama-server -m model.gguf --port 8080`.
+2. ModelHub Chat imports the ones it finds. Otherwise:
+   1. Select **Add...** and pick the program under **Start from**, or **Other OpenAI-compatible server** with
+      the server's `http://.../v1` URL.
+   2. Select **Test**, then **OK**.
+3. These providers have **Auto mode may use its models** on by default.
+
+Ollama's downloaded models can also move into ModelHub, so that every application using ModelHub can share them.
+See *Ollama's models* above.
+
+### Using the models
+
+- **Choosing a model:** select the model name below the message box. ModelHub's own models come first, then one
+  submenu per provider. *Refresh the model list* and *Model providers...* are at the bottom.
+- **Thinking effort:** the setting next to the model (Default, Off, Low, Medium or High). Each provider gets it in
+  its own form: Claude's effort, Codex's `model_reasoning_effort`, Copilot's reasoning effort, or
+  `reasoning_effort` for OpenAI-compatible APIs.
+- **The dot** next to them is green when the model list loaded, and red when it didn't. Click it to refresh.
+- **Auto mode** uses a provider's models only when **Auto mode may use its models** is on. That's on by default for
+  providers on this PC and off for cloud ones. Whatever goes to a cloud model (your messages, attached files and
+  tool results) leaves the PC and is billed to your account there.
+- **Keys** typed into **API key** are stored encrypted for your Windows account (DPAPI) in
+  `%LOCALAPPDATA%\ModelHub\chat\settings.json`.
+
+### Troubleshooting
+
+| What you see | What to do |
+|---|---|
+| A provider is in the list but switched off | It was found but isn't signed in. Select **Edit...**, then **Sign in...**, then **Test**, and switch on **Enabled**. |
+| ChatGPT: "not signed in" | Run `codex login`, or **Sign in...** in the ChatGPT provider. |
+| ChatGPT: "has not listed this account's models yet" | Open the Codex app once (or run `codex`) so that it fetches your models, then refresh the model list. |
+| Claude: "not signed in (run: ant auth login)" | Use **Set up Claude** in the "+" menu. |
+| Copilot: "signed in to X, not Y" | The Copilot runtime is signed in to another host. Use **Sign in...** on this provider to add the account. |
+| "the API key was not accepted (HTTP 401/403)" | Check the key, or create a new one with **Get a key**. |
+| "HTTP 503: … high demand" (Gemini) | Google is overloaded. Try again later, or pick another model. |
+| "HTTP 404" for one model | The model has been retired. Refresh the model list and pick another one. |
+| The status line counts seconds for a long time | The model is still thinking, or the service is slow. Escape stops the wait. |
+| A local server: "cannot connect" | Start the program's server, and check the port in the provider's **URL**. |
+
+### How each provider is connected
+
+- **Claude** goes through Anthropic's Messages API. There is no Anthropic SDK for C++, so the app makes the HTTP
+  requests itself.
+  - Replies stream with adaptive thinking (a summary of the reasoning is shown).
+  - Tools have `eager_input_streaming`, and the thinking effort becomes Claude's effort.
+  - Thinking and tool-use blocks go back unchanged on the next request.
+  - Server-side fallbacks (`fallbacks: "default"`) are on for the models that support them: if a safety
+    classifier declines a request, the API retries it on another model.
+  - With the CLI sign-in, the OAuth token is sent as a Bearer token with the `oauth-2025-04-20` beta header.
+- **ChatGPT** runs OpenAI's Codex CLI.
+  - The CLI is `%CODEX_CLI_PATH%`, else the newest `codex.exe` the Codex app installs in
+    `%LOCALAPPDATA%\OpenAI\Codex\bin`, else one on `PATH`.
+  - The models come from `models_cache.json` in `%CODEX_HOME%` or `%USERPROFILE%\.codex`.
+  - Each answer runs `codex exec --json --ephemeral -s read-only` in the conversation's folder.
+  - The prompt holds the conversation so far and comes in on stdin. Images go in with `--image`.
+  - `--ephemeral` keeps these chats out of your Codex history.
+  - Codex and its helper processes run in a Windows job, so stopping an answer ends them all.
+- **Gemini** uses Google's OpenAI-compatible endpoint (`generativelanguage.googleapis.com/v1beta/openai`).
+  - Gemini 3 returns a thought signature (`extra_content.google.thought_signature`) with each tool call. It goes
+    back with the call on the next request; without it, Gemini 3 rejects a conversation that uses tools.
+  - Models that don't chat over this API are left out of the list: Lyria, Genie, Veo, Imagen, Nano Banana, live
+    audio, robotics, computer use and AQA.
+- **GitHub Copilot** goes through the local Copilot runtime, the engine the GitHub Copilot app and GitHub's
+  Copilot SDK use.
+  - ModelHub Chat starts `copilot-runtime.exe --headless --no-auto-update --stdio`: the newest one in
+    `%LOCALAPPDATA%\github-copilot-sdk\cli`, or `%COPILOT_CLI_PATH%`.
+  - There is one runtime per host, with `COPILOT_GH_HOST` set to it, and they end with the app.
+  - It speaks JSON-RPC with `Content-Length` framing.
+  - Each message is a fresh session (`session.create` with streaming, `session.send`, `session.delete`), with the
+    conversation so far as context. Images go as `blob` attachments.
+  - Copilot runs its own tool loop, but its built-in shell, file and MCP tools are off (`availableTools` lists
+    only the app's tools). It calls the app's tools through `external_tool.requested`, and the transcript shows
+    each call. Permission requests are refused.
+  - GitHub Models, the HTTP API at `models.github.ai`, was retired on 30 July 2026. Saved providers for it are
+    dropped.
+- **Google Antigravity** can't be connected directly. Its `agentapi` command only starts conversations inside a
+  running Antigravity. Its sign-in and local service are private to the app, and Google blocks other programs
+  from using them.
+- **OpenAI, Mistral, OpenRouter, Groq, DeepSeek and local servers** use `/v1/chat/completions` with streaming.
+  Models that only do embeddings, speech, images or moderation are left out of the list.
+
 ## Build
 
 Needs Visual Studio 2022 or 2026 with C++ and its bundled vcpkg (`VCPKG_ROOT`).
@@ -171,7 +539,7 @@ cmake --build --preset release
   | --- | --- |
   | `include\modelhub\` | `modelhub.h` (C interface), `modelhub.hpp` (C++14 wrapper), `modelhub_client.h` (service client) |
   | `lib\<Config>\ModelHubSdk.lib` | import library |
-  | `bin\<Config>\` | `ModelHubSdk.dll`, `ModelHub.exe`, `ModelHubManager.exe` |
+  | `bin\<Config>\` | `ModelHubSdk.dll`, `ModelHub.exe`, `ModelHubManager.exe`, `ModelHubChat.exe` |
   | `bin\catalog.json` | the catalog |
   | `bin\llama\` | llama.cpp's server |
   | `ModelHubConfig.cmake` | for `find_package(ModelHub CONFIG PATHS <ModelHub>/build/sdk)` |
@@ -243,9 +611,10 @@ Local builds are version 0.1.0 unless you pass `-DMODELHUB_VERSION=<version>`.
 | `src/core/` | `HubCore` and everything it uses: catalog, advisor, hardware, store, downloader, llama.cpp servers, Hugging Face browsing (`HfBrowse`), shared lessons (`Lessons`) |
 | `src/sdk/` | `ModelHubSdk.dll` (the C interface over `HubCore`) |
 | `src/hub/` | `ModelHub.exe` (the HTTP service over `HubCore`) |
+| `src/chat/` | `ModelHubChat.exe` (MFC chat client: streaming, reasoning, built-in tools, MCP servers) |
 | `src/manager/` | `ModelHubManager.exe` (tray icon, model manager and Hugging Face browser, Win32); icons in `res/` (`scripts/make_icons.py`) |
 | `docs/images/` | the screenshots in this README |
-| `docs/lessons/` | lessons shipped with ModelHub: `reveng-fix.jsonl` (119 fixes for compiler errors) and `reveng-stitch-lessons.md` (a playbook) |
+| `docs/lessons/` | lessons shipped with ModelHub: `reveng-fix.jsonl`, `port-fix.jsonl`, `refactor-fix.jsonl` (fixes for compiler errors) and the playbooks `reveng-stitch-lessons.md`, `port-fix.md`; `scripts/export_lessons.py` adds to them |
 | `bin/`, `bin-vs2022/` | build output (not in git): the programs |
 | `.clang-format` | the code style (Allman braces, 4 spaces; Visual Studio applies it with "Use ClangFormat") |
 | `include/modelhub/` | the public headers (C, C++14 wrapper, service client) |
@@ -349,7 +718,7 @@ without a GPU recommends `qwen3-coder-30b-a3b`.
 | `config.json` | Shared settings: service port (default 39281), `search_dirs`, `llama_server`, `idle_minutes` (10), `parallel` slots (2), `base_port` (39300), `llama_args`. |
 | `catalog.json` | Optional. Overrides the catalog shipped next to `ModelHub.exe` / `ModelHubSdk.dll`. |
 | `custom_models.json` | Models applications added (`add_model`). |
-| `lessons\` | What applications learned: `<domain>.jsonl` (one record per line) and `<domain>.md` (a playbook). Shared by every process; writes hold a machine-wide lock. Files in the repository's `docs/lessons` (shipped in a `lessons` folder next to `ModelHub.exe`) are copied here when missing and never overwrite what applications added. |
+| `lessons\` | What applications learned: `<domain>.jsonl` (one record per line) and `<domain>.md` (a playbook). Shared by every process; writes hold a machine-wide lock. The repository's `docs/lessons` (shipped in a `lessons` folder next to `ModelHub.exe`) is brought in at start: a missing file is copied, an existing one gets only the records (same key, model, removed, added) and playbook sections (same `##` heading or text) it lacks; what applications added is never changed. |
 | `manifest.json` | Every model file found, with its hash, whether it is verified, and which applications use it. Shared by every process; changes are made under a machine-wide lock after re-reading it, and each process picks up the others' changes. |
 | `hub.json` | The running hub's port and access token. It is removed when the hub stops. |
 | `install.json` | Where `ModelHub.exe` is, so clients can start it. |

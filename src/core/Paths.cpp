@@ -45,12 +45,19 @@ uint64_t FreeDiskBytes(const fs::path& p)
     while (!probe.empty() && !fs::exists(probe, ec))
     {
         if (probe == probe.parent_path())
+        {
             break;
+        }
+
         probe = probe.parent_path();
     }
+
     ULARGE_INTEGER freeBytes{};
     if (!probe.empty() && GetDiskFreeSpaceExW(probe.c_str(), &freeBytes, nullptr, nullptr))
+    {
         return freeBytes.QuadPart;
+    }
+
     return 0;
 }
 
